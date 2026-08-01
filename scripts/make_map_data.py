@@ -14,8 +14,31 @@ ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / "data" / "raw"
 PROC = ROOT / "data" / "processed"
 APP = ROOT / "app" / "data"
+INDEX = ROOT / "app" / "index.html"
 
 SIMPLIFY_DP = 3  # ~110m at London's latitude — plenty for borough outlines
+
+# The scorecard fields the page reads out of the inlined `DATA` literal.
+#
+# `DATA` is inlined rather than fetched so the ledger view — the headline, the
+# quadrant chart and the ranked table — still renders from a file:// page with
+# no server. That is worth keeping, but it used to mean hand-editing a 33-object
+# literal: the list silently froze, and when the demand-lens columns were added
+# the leaderboard rendered zero rows and the surplus stat read "0 of 33" with no
+# error anywhere. So the literal is now generated here, and this list is the
+# contract — a name that is not in the scorecard aborts the build.
+DATA_FIELDS = [
+    "borough", "sites_permitted_not_started", "hectares_permitted_not_started",
+    "homes_min_permitted_not_started", "homes_max_permitted_not_started",
+    "ten_year_target", "pct_of_target_pns", "median_permission_age_years",
+    "homes_capacity_reported", "sites_total", "hectares_total",
+    "data_quality_flag", "pct_sites_with_homes", "homes_min_unpermissioned",
+    "pct_hectares_public",
+    # demand lens
+    "demand_gap_per_km2", "demand_gap_per_km2_median", "tightness_median",
+    "msoas", "msoas_surplus",
+]
+DATA_RE = re.compile(r"<script>const DATA=\[.*?\];</script>", re.S)
 
 
 def parse_multipolygon(wkt: str):
@@ -68,6 +91,43 @@ def _generic_url(u) -> bool:
     if pd.isna(u):
         return False
     return "?" not in str(u) and "#" not in str(u)
+
+
+def inject_data(sc: pd.DataFrame) -> None:
+    """Rewrite the inlined `const DATA=[...]` literal in app/index.html.
+
+    Every failure here is raised, never warned. The bug this replaces was
+    silent — the page loaded, the console was clean, and one panel was simply
+    empty. A broken build is far cheaper than a plausible-looking wrong one.
+    """
+    missing = [c for c in DATA_FIELDS if c not in sc.columns]
+    if missing:
+        raise SystemExit(
+            f"index.html needs scorecard fields that aggregate.py did not "
+            f"produce: {missing}. Either add them upstream or drop them from "
+            f"DATA_FIELDS — do not leave the page reading a column that is "
+            f"not there.")
+
+    html = INDEX.read_text()
+    if len(DATA_RE.findall(html)) != 1:
+        raise SystemExit(
+            f"expected exactly 1 `const DATA=[…]` block in {INDEX.name}, found "
+            f"{len(DATA_RE.findall(html))}. The literal was probably reformatted; "
+            f"fix it or this script will silently stop updating the page.")
+
+    # Order matches the ledger's default sort so a hand-read of the file and the
+    # rendered table agree.
+    recs = json.loads(sc[DATA_FIELDS].round(2)
+                      .to_json(orient="records", double_precision=2))
+    block = "<script>const DATA=" + json.dumps(recs, separators=(",", ":")) + ";</script>"
+    # A plain replacement string would treat backslashes and \g as escapes.
+    updated = DATA_RE.sub(lambda _m: block, html, count=1)
+    if updated != html:
+        INDEX.write_text(updated)
+        print(f"index.html: DATA refreshed ({len(recs)} boroughs, "
+              f"{len(DATA_FIELDS)} fields)")
+    else:
+        print(f"index.html: DATA already current ({len(recs)} boroughs)")
 
 
 def main() -> None:
@@ -176,6 +236,9 @@ def main() -> None:
     if ref_src.exists():
         (APP / "london_reference.json").write_text(ref_src.read_text())
         print("london_reference.json written")
+
+    # Last, so the page is only rewritten once every payload beside it is valid.
+    inject_data(sc)
 
 
 if __name__ == "__main__":
