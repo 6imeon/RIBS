@@ -226,6 +226,9 @@ def main() -> None:
             "pub": bool(r["public_owned"]),
             "pd": (str(r["permission_date"])[:10]
                    if not pd.isna(r["permission_date"]) else None),
+            # Register entry date — best available start for "how long pending".
+            "ed": (str(r["entry-date"])[:10]
+                   if not pd.isna(r["entry-date"]) else None),
             "ad": (str(r["site-address"])[:80]
                    if not pd.isna(r["site-address"]) else None),
             # The register's own entity id. Unlike site-plan-url this always

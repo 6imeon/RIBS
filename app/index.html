@@ -63,6 +63,34 @@ button.f:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
   box-sizing:border-box}
 .maphint{font-size:12px;color:var(--ink-3)}
 
+/* --- borough site rankings (below the map, only when a borough is selected) --- */
+.borough-detail{margin-top:28px;
+  width:calc(100vw - 56px);max-width:1720px;
+  margin-left:calc(560px - 50vw);margin-right:calc(560px - 50vw)}
+@media (min-width:1776px){
+  .borough-detail{width:1720px;margin-left:calc(560px - 860px);margin-right:auto}
+}
+.borough-detail .bdet-head{margin-bottom:16px}
+.borough-detail .bdet-head h3{font-size:20px;margin:0 0 4px;letter-spacing:-.01em}
+.borough-detail .bdet-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+.borough-detail .bdet-panel h4{font-size:14px;margin:0 0 4px}
+.borough-detail .bdet-panel .maphint{margin-bottom:10px}
+.borough-detail .tablewrap{max-height:420px;overflow:auto}
+.borough-detail table{min-width:0;font-size:12.5px}
+.borough-detail th{position:sticky;top:0;z-index:2;font-size:10px;padding:8px 9px}
+.borough-detail td .cell{padding:7px 9px;white-space:normal}
+.borough-detail td:first-child .cell{white-space:nowrap}
+.borough-detail tbody tr{cursor:pointer}
+.borough-detail tbody tr:hover{background:var(--amber-soft)}
+.borough-detail .ad{font-weight:500;line-height:1.35}
+.borough-detail .stuck{color:var(--crit);font-weight:600}
+.borough-detail .empty{padding:14px 12px;font-size:13px;color:var(--ink-3);
+  border:1px solid var(--rule);border-radius:3px;background:var(--card)}
+@media (max-width:900px){
+  .borough-detail{width:auto;max-width:none;margin-left:0;margin-right:0}
+  .borough-detail .bdet-grid{grid-template-columns:1fr}
+}
+
 /* --- demand lens: mode switch, insight sentence, leaderboard --- */
 .modebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:11px}
 .modelbl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;
@@ -156,7 +184,7 @@ button.m:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
   color:var(--ink-3);font-size:10px}
 .leaflet-control-attribution a{color:var(--ink-2)}
 @media (max-width:1180px){ /* wrapper is no longer wider than the viewport */
-  .mapgrid{width:auto;max-width:none;margin-left:0;margin-right:0}
+  .mapgrid,.borough-detail{width:auto;max-width:none;margin-left:0;margin-right:0}
 }
 @media (max-width:900px){
   .mapgrid{grid-template-columns:1fr}
@@ -629,7 +657,8 @@ footer a{color:var(--ink-2)}
     <p class="deck">Each circle is one brownfield site, sized by area. Turn on
     <b>Application timelines</b> to hover digital planning applications
     (Camden, Barnet, Lambeth, Southwark pilots) and see a standardised lifecycle
-    from receipt to decision. Click a borough to filter and zoom.</p>
+    from receipt to decision. Click a borough to filter, zoom, and rank its
+    outstanding approvals and permitted-but-unbuilt sites by estimated homes.</p>
 
     <div class="filters" id="filters">
       <button class="f" data-k="pns" aria-pressed="true">Permitted, not started</button>
@@ -764,6 +793,49 @@ footer a{color:var(--ink-2)}
           University of Warwick. Data provided by Dr Amrita Kulka and Dr Nikhil Datta.
           Research measures &mdash; not official estimates of housing need or planning
           targets. Not for publication without approval.
+        </div>
+      </div>
+    </div>
+
+    <!-- Site rankings for the selected borough: outstanding approvals vs
+         permitted-but-not-built. Homes = council dwelling estimates (the closest
+         published proxy for human occupancy capacity). -->
+    <div class="borough-detail" id="borough-detail" hidden>
+      <div class="bdet-head">
+        <h3 id="bdet-title">Borough sites</h3>
+        <p class="maphint" id="bdet-sub">Ranked by estimated homes. Click a row to zoom to the site.</p>
+      </div>
+      <div class="bdet-grid">
+        <div class="bdet-panel">
+          <h4>Awaiting approval</h4>
+          <p class="maphint">Pending decision and applications stuck in planning review,
+            ranked by highest estimated homes. Wait time is since register entry
+            (or since receipt for pilot digital applications).</p>
+          <div class="tablewrap" id="awaitwrap">
+            <table id="awaittbl">
+              <thead><tr>
+                <th>#</th><th>Site</th><th>Homes</th><th>Status</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="empty" id="awaitempty" hidden>No pending or stuck applications
+            published for this borough.</div>
+        </div>
+        <div class="bdet-panel">
+          <h4>Approved, not yet completed</h4>
+          <p class="maphint">Permission granted but construction not started on the
+            register &mdash; ranked by highest estimated homes.</p>
+          <div class="tablewrap" id="approvedwrap">
+            <table id="approvedtbl">
+              <thead><tr>
+                <th>#</th><th>Site</th><th>Homes</th><th>Ha</th><th>Granted</th><th>Age</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="empty" id="approvedempty" hidden>No permitted-but-unstarted sites
+            published for this borough.</div>
         </div>
       </div>
     </div>
@@ -1528,8 +1600,173 @@ function initMap(){
       });
     }
   }
+  function homesOf(s){ return s.dmin!=null?s.dmin:(s.dmax!=null?s.dmax:null); }
+  function fmtHomes(s){
+    const lo=s.dmin, hi=s.dmax;
+    if(lo==null&&hi==null) return '<span class="np">n/p</span>';
+    if(lo!=null&&hi!=null&&lo!==hi) return esc(fmt(lo))+"\u2013"+esc(fmt(hi));
+    return esc(fmt(lo!=null?lo:hi));
+  }
+  function fmtHa(s){ return s.ha!=null?esc(fmt(s.ha,2)):"\u2013"; }
+  function permissionAgeYears(pd){
+    if(!pd) return null;
+    const d=new Date(pd+"T12:00:00");
+    if(Number.isNaN(d.getTime())) return null;
+    return (Date.now()-d.getTime())/(365.25*86400000);
+  }
+  function appBoroughMatch(a,b){
+    if(!b) return true;
+    const want=b.toLowerCase();
+    return a.cl.toLowerCase()===want
+      || a.c===want
+      || want.startsWith(a.cl.toLowerCase());
+  }
+  function receivedAt(a){
+    const hit=(a.ev||[]).find(e=>e.k==="received");
+    return hit?hit.at:((a.ev&&a.ev[0])?a.ev[0].at:null);
+  }
+  function appStuckDays(a){
+    if(a.o!=="in_progress") return null;
+    const today=new Date();
+    const todayIso=today.getFullYear()+"-"+
+      String(today.getMonth()+1).padStart(2,"0")+"-"+
+      String(today.getDate()).padStart(2,"0");
+    const d=daysBetween(receivedAt(a), todayIso);
+    return (d!=null&&d>30)?d:null;
+  }
+  function openSitePopup(s){
+    L.popup({maxWidth:320}).setLatLng([s.y,s.x]).setContent(popup(s)).openOn(map);
+    map.panTo([s.y,s.x],{animate:true});
+  }
+  function openAppPopup(a){
+    L.popup({maxWidth:340}).setLatLng([a.y,a.x]).setContent(appPopup(a)).openOn(map);
+    map.panTo([a.y,a.x],{animate:true});
+  }
+  // Two rankings under the map once a borough is picked: (1) outstanding /
+  // stuck approvals by estimated homes, (2) permitted-but-not-built by homes.
+  function drawBoroughDetail(){
+    const box=document.getElementById("borough-detail");
+    if(!sel){ box.hidden=true; return; }
+    box.hidden=false;
+    document.getElementById("bdet-title").textContent=sel;
+    const awaiting=[];
+    const today=new Date();
+    const todayIso=today.getFullYear()+"-"+
+      String(today.getMonth()+1).padStart(2,"0")+"-"+
+      String(today.getDate()).padStart(2,"0");
+    for(const s of SITES){
+      if(s.b!==sel) continue;
+      if(s.st!=="pending-decision") continue;
+      const days=daysBetween(s.ed, todayIso);
+      awaiting.push({kind:"site", s, homes:homesOf(s), ha:s.ha||0,
+        stuck:days!=null&&days>30, days});
+    }
+    for(const a of APPS){
+      if(!appBoroughMatch(a, sel)) continue;
+      const days=appStuckDays(a);
+      if(days==null) continue;
+      awaiting.push({kind:"app", a, homes:null, ha:0, stuck:true, days});
+    }
+    // Highest occupancy first; unpublished capacity and stuck apps (no dwellings)
+    // sink below sites that publish a homes figure. Among equals, longer waits up.
+    awaiting.sort((x,y)=>{
+      const hx=x.homes, hy=y.homes;
+      if(hx!=null&&hy!=null&&hy!==hx) return hy-hx;
+      if(hx!=null&&hy==null) return -1;
+      if(hx==null&&hy!=null) return 1;
+      const dx=x.days||0, dy=y.days||0;
+      if(dy!==dx) return dy-dx;
+      return (y.ha||0)-(x.ha||0);
+    });
+    const approved=SITES.filter(s=>s.b===sel&&s.pns)
+      .map(s=>({s, homes:homesOf(s), ha:s.ha||0}))
+      .sort((x,y)=>{
+        const hx=x.homes, hy=y.homes;
+        if(hx!=null&&hy!=null&&hy!==hx) return hy-hx;
+        if(hx!=null&&hy==null) return -1;
+        if(hx==null&&hy!=null) return 1;
+        return (y.ha||0)-(x.ha||0);
+      });
+
+    const nAwaitSites=awaiting.filter(r=>r.kind==="site").length;
+    const nStuck=awaiting.filter(r=>r.kind==="app").length;
+    const nApprHomes=approved.reduce((t,r)=>t+(r.homes||0),0);
+    document.getElementById("bdet-sub").innerHTML=
+      `${esc(fmt(nAwaitSites))} pending`+
+      (nStuck?` · ${esc(fmt(nStuck))} stuck in review`:"")+
+      ` · ${esc(fmt(approved.length))} permitted not started`+
+      (nApprHomes?` (${esc(fmt(nApprHomes))}+ homes)`:"")+
+      `. Click a row to zoom.`;
+
+    const awaitWrap=document.getElementById("awaitwrap");
+    const awaitEmpty=document.getElementById("awaitempty");
+    const awaitBody=document.querySelector("#awaittbl tbody");
+    if(!awaiting.length){
+      awaitWrap.hidden=true; awaitEmpty.hidden=false; awaitBody.innerHTML="";
+    } else {
+      awaitWrap.hidden=false; awaitEmpty.hidden=true;
+      awaitBody.innerHTML=awaiting.map((r,i)=>{
+        if(r.kind==="site"){
+          const s=r.s;
+          const wait=r.days!=null
+            ? `Pending decision · <span class="${r.days>30?"stuck":""}">${esc(fmtGap(r.days))}</span>`
+            : "Pending decision";
+          return `<tr data-kind="site" data-i="${i}">
+            <td><div class="cell mono">${i+1}</div></td>
+            <td><div class="cell ad">${esc(s.ad||"(no address)")}</div></td>
+            <td><div class="cell mono">${fmtHomes(s)}</div></td>
+            <td><div class="cell">${wait}</div></td>
+          </tr>`;
+        }
+        const a=r.a;
+        return `<tr data-kind="app" data-i="${i}">
+          <td><div class="cell mono">${i+1}</div></td>
+          <td><div class="cell ad">${esc(a.ad||a.r)}
+            <div class="maphint" style="margin:2px 0 0">${esc(a.tl||a.t||"")} · ${esc(a.r)}</div>
+          </div></td>
+          <td><div class="cell mono"><span class="np">\u2013</span></div></td>
+          <td><div class="cell stuck">Stuck · ${esc(fmtGap(r.days))}</div></td>
+        </tr>`;
+      }).join("");
+      awaitBody.querySelectorAll("tr").forEach(tr=>{
+        const r=awaiting[+tr.dataset.i];
+        tr.onclick=()=>{
+          if(r.kind==="site") openSitePopup(r.s);
+          else openAppPopup(r.a);
+        };
+      });
+    }
+
+    const apprWrap=document.getElementById("approvedwrap");
+    const apprEmpty=document.getElementById("approvedempty");
+    const apprBody=document.querySelector("#approvedtbl tbody");
+    if(!approved.length){
+      apprWrap.hidden=true; apprEmpty.hidden=false; apprBody.innerHTML="";
+    } else {
+      apprWrap.hidden=false; apprEmpty.hidden=true;
+      apprBody.innerHTML=approved.map((r,i)=>{
+        const s=r.s;
+        const age=permissionAgeYears(s.pd);
+        const ageHot=age!=null&&age>=8.5;
+        return `<tr data-i="${i}">
+          <td><div class="cell mono">${i+1}</div></td>
+          <td><div class="cell ad">${esc(s.ad||"(no address)")}</div></td>
+          <td><div class="cell mono">${fmtHomes(s)}</div></td>
+          <td><div class="cell mono">${fmtHa(s)}</div></td>
+          <td><div class="cell mono">${s.pd?esc(s.pd):"\u2013"}</div></td>
+          <td><div class="cell mono ${ageHot?"age-hot":""}">${
+            age==null?"\u2013":esc(fmt(age,1))+" yrs"}</div></td>
+        </tr>`;
+      }).join("");
+      apprBody.querySelectorAll("tr").forEach(tr=>{
+        const r=approved[+tr.dataset.i];
+        tr.onclick=()=>openSitePopup(r.s);
+      });
+    }
+  }
   function select(b){
-    sel=b; drawBoundaries(); drawSites(); drawApps(); mtable(); drawInsight(); drawBoard();
+    sel=b; drawBoundaries(); drawSites(); drawApps(); mtable();
+    drawInsight(); drawBoard(); drawBoroughDetail();
     if(b){const f=BOR.features.find(f=>f.properties.borough===b);
       if(f) map.fitBounds(L.geoJSON(f).getBounds(),{padding:[30,30]});}
     else fitLondon();
