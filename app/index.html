@@ -38,8 +38,10 @@
 button.f{background:var(--card);border:1px solid var(--rule);color:var(--ink-2);
   padding:5px 11px;border-radius:20px;cursor:pointer;font:inherit;font-size:12.5px}
 button.f:hover{border-color:var(--ink-3);color:var(--ink)}
+/* --paper, not #fff: amber lightens in dark mode, where white-on-amber drops
+   under 3:1. The token gives light mode near-white and dark mode near-black. */
 button.f[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);
-  color:#fff;font-weight:600}
+  color:var(--paper);font-weight:600}
 button.f:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 .mapstat{border:1px solid var(--rule);border-radius:3px;background:var(--card);
   padding:12px 14px;box-shadow:var(--shadow)}
@@ -71,7 +73,11 @@ button.m{background:transparent;border:0;border-right:1px solid var(--rule);
   color:var(--ink-2);padding:5px 14px;cursor:pointer;font:inherit;font-size:12.5px}
 button.m:last-child{border-right:0}
 button.m:hover{color:var(--ink);background:var(--rule-2)}
-button.m[aria-checked="true"]{background:var(--slate);color:#fff;font-weight:600}
+/* --slate is lightened in dark mode for legibility on the dark ground, which
+   leaves white-on-slate at only ~3:1. Pair it with the dark ink instead — the
+   token flips with the theme, so each mode gets the readable pairing. */
+button.m[aria-checked="true"]{background:var(--slate);color:var(--paper);
+  font-weight:600}
 button.m:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
 .modehint{font-size:12px;color:var(--ink-3);flex:1;min-width:190px}
 .insight{margin-top:12px;padding:13px 15px;border:1px solid var(--rule);
@@ -97,7 +103,7 @@ button.m:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
 .lbfoot{margin-top:6px}
 .err{border:1px solid var(--crit);background:color-mix(in srgb,var(--crit) 12%,transparent);
   border-radius:3px;padding:14px 16px;font-size:13.5px}
-.err code{font-family:"IBM Plex Mono",monospace;font-size:12.5px}
+.err code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
 /* leaflet on paper */
 .leaflet-container{background:var(--rule-2);font:inherit}
 .leaflet-popup-content-wrapper,.leaflet-tooltip{background:var(--card);color:var(--ink);
@@ -124,67 +130,88 @@ button.m:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
 </style>
 <title>London Land Ledger — permitted, unstarted</title>
 <style>
+/* Palette: cool institutional neutral, one authoritative blue.
+   The neutrals carry a slight blue bias (hue ~215) rather than being pure
+   grey, so they read as chosen and sit under the accent without muddying it.
+   Amber is deliberately NOT the brand colour — it means exactly one thing in
+   this tool, "permitted but not started", and spending it on chrome would
+   blunt the only signal the map exists to convey. */
 :root{
-  --paper:#FAF7F1; --ink:#1A1712; --ink-2:#4A4237; --ink-3:#7A7264;
-  --rule:#DED6C8; --rule-2:#EDE7DC; --card:#FFFFFF;
-  --amber:#C86A1E; --amber-soft:#F2E2D0; --amber-ink:#9A4E10;
-  --slate:#3E6B8C; --slate-soft:#DCE6EE;
-  --crit:#A32E1F; --ok:#4B6B3A;
-  --shadow:0 1px 2px rgba(26,23,18,.06),0 8px 24px -12px rgba(26,23,18,.14);
+  --paper:#F7F8FA; --ink:#101725; --ink-2:#414D61; --ink-3:#6B7789;
+  --rule:#D8DEE7; --rule-2:#EAEEF3; --card:#FFFFFF;
+  --amber:#B45309; --amber-soft:#FBEBD8; --amber-ink:#8A3F07;
+  --slate:#1D4E7C; --slate-soft:#DEE9F3;
+  --crit:#9F1D2E; --ok:#2F6B4F; --mauve:#5E5B8C;
+  --shadow:0 1px 2px rgba(16,23,37,.05),0 8px 24px -12px rgba(16,23,37,.16);
 }
+/* Dark is not an inversion: the accents are lifted in luminance and dropped in
+   saturation so they stay legible on a dark ground without glowing. */
 @media (prefers-color-scheme:dark){
   :root{
-    --paper:#12100D; --ink:#F2EDE4; --ink-2:#B8AF9F; --ink-3:#8A8172;
-    --rule:#2E2820; --rule-2:#221D17; --card:#1A1611;
-    --amber:#E08A3C; --amber-soft:#3A2818; --amber-ink:#F0A662;
-    --slate:#6E9CBE; --slate-soft:#1C2A36;
-    --crit:#D9634E; --ok:#7FA05F;
-    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
+    --paper:#0D1117; --ink:#E8EDF4; --ink-2:#A2AEBF; --ink-3:#727F91;
+    --rule:#242C38; --rule-2:#1A212B; --card:#151B24;
+    --amber:#E08A3E; --amber-soft:#2E2113; --amber-ink:#F2A961;
+    --slate:#5B9BD5; --slate-soft:#152435;
+    --crit:#E06A78; --ok:#5FA383; --mauve:#9490C8;
+    --shadow:0 1px 2px rgba(0,0,0,.5),0 8px 24px -12px rgba(0,0,0,.7);
   }
 }
 :root[data-theme="dark"]{
-  --paper:#12100D; --ink:#F2EDE4; --ink-2:#B8AF9F; --ink-3:#8A8172;
-  --rule:#2E2820; --rule-2:#221D17; --card:#1A1611;
-  --amber:#E08A3C; --amber-soft:#3A2818; --amber-ink:#F0A662;
-  --slate:#6E9CBE; --slate-soft:#1C2A36;
-  --crit:#D9634E; --ok:#7FA05F;
-  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
+  --paper:#0D1117; --ink:#E8EDF4; --ink-2:#A2AEBF; --ink-3:#727F91;
+  --rule:#242C38; --rule-2:#1A212B; --card:#151B24;
+  --amber:#E08A3E; --amber-soft:#2E2113; --amber-ink:#F2A961;
+  --slate:#5B9BD5; --slate-soft:#152435;
+  --crit:#E06A78; --ok:#5FA383; --mauve:#9490C8;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 8px 24px -12px rgba(0,0,0,.7);
 }
 :root[data-theme="light"]{
-  --paper:#FAF7F1; --ink:#1A1712; --ink-2:#4A4237; --ink-3:#7A7264;
-  --rule:#DED6C8; --rule-2:#EDE7DC; --card:#FFFFFF;
-  --amber:#C86A1E; --amber-soft:#F2E2D0; --amber-ink:#9A4E10;
-  --slate:#3E6B8C; --slate-soft:#DCE6EE;
-  --crit:#A32E1F; --ok:#4B6B3A;
-  --shadow:0 1px 2px rgba(26,23,18,.06),0 8px 24px -12px rgba(26,23,18,.14);
+  --paper:#F7F8FA; --ink:#101725; --ink-2:#414D61; --ink-3:#6B7789;
+  --rule:#D8DEE7; --rule-2:#EAEEF3; --card:#FFFFFF;
+  --amber:#B45309; --amber-soft:#FBEBD8; --amber-ink:#8A3F07;
+  --slate:#1D4E7C; --slate-soft:#DEE9F3;
+  --crit:#9F1D2E; --ok:#2F6B4F; --mauve:#5E5B8C;
+  --shadow:0 1px 2px rgba(16,23,37,.05),0 8px 24px -12px rgba(16,23,37,.16);
 }
 
+/* Type: system stack by necessity, and stated honestly. The page must work
+   offline (no CDN) and ships no font binaries, so naming webfonts here would
+   only produce a silent fallback that varies per machine — which is what this
+   file used to do. These stacks resolve to a real face everywhere.
+   Headings share the body face at a heavier weight and tighter tracking: on a
+   dense data page the serif/sans split added decoration, not hierarchy. */
 *{box-sizing:border-box}
 body{
   margin:0;background:var(--paper);color:var(--ink);
-  font-family:"IBM Plex Sans","Segoe UI",system-ui,-apple-system,sans-serif;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;
 }
-.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   font-variant-numeric:tabular-nums}
 .wrap{max-width:1120px;margin:0 auto;padding:0 28px}
-h1,h2,h3{font-family:"Instrument Serif","Iowan Old Style","Palatino Linotype",Georgia,serif;
-  font-weight:400;text-wrap:balance;letter-spacing:-.01em;margin:0}
+h1,h2,h3{font-family:inherit;font-weight:640;text-wrap:balance;
+  letter-spacing:-.021em;margin:0}
 
 /* ---------- masthead ---------- */
 .mast{border-bottom:1.5px solid var(--ink);padding:26px 0 14px;margin-bottom:0}
 .mast .row{display:flex;justify-content:space-between;align-items:baseline;gap:20px;flex-wrap:wrap}
 .eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);
   font-weight:600}
-.mast h1{font-size:clamp(34px,5.2vw,56px);line-height:1.02;margin:6px 0 0}
+/* Slightly smaller than the serif it replaces — a bold sans at 56px shouts
+   where a serif at 56px spoke. */
+.mast h1{font-size:clamp(31px,4.5vw,47px);line-height:1.06;margin:7px 0 0;
+  letter-spacing:-.028em}
 .mast .sub{color:var(--ink-2);font-size:15.5px;max-width:60ch;margin-top:10px}
 
 /* ---------- thesis ---------- */
 .thesis{padding:34px 0 8px;border-bottom:1px solid var(--rule)}
 .figure-row{display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap}
-.bignum{font-family:"Instrument Serif",Georgia,serif;font-size:clamp(56px,9vw,96px);
-  line-height:.92;color:var(--amber);letter-spacing:-.02em}
-.bignum .u{font-size:.34em;color:var(--ink-2);letter-spacing:0}
+/* The headline figure is a measurement, so it is set in the mono face with
+   tabular figures rather than a display serif — it should read as an instrument
+   reading, not a pull-quote. */
+.bignum{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  font-variant-numeric:tabular-nums;font-size:clamp(48px,7.4vw,78px);
+  font-weight:600;line-height:.98;color:var(--amber);letter-spacing:-.035em}
+.bignum .u{font-size:.34em;color:var(--ink-2);letter-spacing:0;font-weight:500}
 .thesis .lede{font-size:19px;line-height:1.5;max-width:44ch;color:var(--ink)}
 .thesis .lede b{color:var(--amber-ink);font-weight:600}
 .statset{display:flex;gap:34px;flex-wrap:wrap;margin-top:22px;padding-bottom:26px}
@@ -462,7 +489,7 @@ footer a{color:var(--ink-2)}
         <div class="legend-map" id="maplegend">
           <span><i style="background:var(--amber)"></i>Permitted, not started</span>
           <span><i style="background:var(--slate)"></i>No permission</span>
-          <span><i style="background:#8B7BA8"></i>Pending decision</span>
+          <span><i style="background:var(--mauve)"></i>Pending decision</span>
         </div>
         <div class="mtablewrap">
           <table id="mtbl">
@@ -583,20 +610,20 @@ function draw(){
   ctx.strokeStyle=crit; ctx.lineWidth=1.5; ctx.setLineDash([7,4]);
   ctx.beginPath();ctx.moveTo(L,Y(100));ctx.lineTo(L+iw,Y(100));ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle=crit; ctx.font="600 20px 'IBM Plex Mono',monospace";
+  ctx.fillStyle=crit; ctx.font="600 20px ui-monospace,SFMono-Regular,Menlo,monospace";
   ctx.textAlign="left"; ctx.fillText("100% of ten-year target",L+10,Y(100)-12);
 
   // axes
   ctx.strokeStyle=ink; ctx.lineWidth=1.5;
   ctx.beginPath();ctx.moveTo(L,T);ctx.lineTo(L,T+ih);ctx.lineTo(L+iw,T+ih);ctx.stroke();
 
-  ctx.fillStyle=ink3; ctx.font="500 19px 'IBM Plex Mono',monospace";
+  ctx.fillStyle=ink3; ctx.font="500 19px ui-monospace,SFMono-Regular,Menlo,monospace";
   ctx.textAlign="right";
   for(let v=0;v<=125;v+=25){ctx.fillText(v+"%",L-14,Y(v)+7);}
   ctx.textAlign="center";
   for(let v=0;v<=2000;v+=500){ctx.fillText(v.toLocaleString("en-GB"),X(v),T+ih+34);}
 
-  ctx.font="600 17px 'IBM Plex Sans',sans-serif"; ctx.fillStyle=ink3;
+  ctx.font="600 17px system-ui,-apple-system,'Segoe UI',sans-serif"; ctx.fillStyle=ink3;
   ctx.save();ctx.translate(26,T+ih/2);ctx.rotate(-Math.PI/2);ctx.textAlign="center";
   ctx.fillText("PERMITTED, UNSTARTED — % OF TEN-YEAR TARGET",0,0);ctx.restore();
   ctx.textAlign="center";
@@ -620,7 +647,7 @@ function draw(){
   const NAMED={"Kensington and Chelsea":[0,-62],"Barking and Dagenham":[0,-74],
     "Camden":[0,-42],"Lewisham":[0,-40],"Wandsworth":[58,22],"Barnet":[0,-60],
     "Westminster":[0,-32],"Sutton":[0,-30],"Greenwich":[0,-42]};
-  ctx.font="600 21px 'IBM Plex Sans',sans-serif"; ctx.textAlign="center";
+  ctx.font="600 21px system-ui,-apple-system,'Segoe UI',sans-serif"; ctx.textAlign="center";
   for(const p of pts){
     const off=NAMED[p.borough]; if(!off) continue;
     const label=p.borough==="Kensington and Chelsea"?"Kensington & Chelsea":
@@ -737,7 +764,7 @@ function initMap(){
 
   const statusColor=s=>s.pns?CSSV("--amber")
     :s.st==="not-permissioned"?CSSV("--slate")
-    :s.st==="pending-decision"?"#8B7BA8":CSSV("--ink-3");
+    :s.st==="pending-decision"?CSSV("--mauve"):CSSV("--ink-3");
 
   function visible(s){
     if(F.deliverable&&!s.dlv) return false;
