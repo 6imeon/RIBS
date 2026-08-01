@@ -104,6 +104,8 @@ def main() -> None:
                   "homes_min_unpermissioned", "ten_year_target",
                   "pct_of_target_pns", "pct_of_target_unpermissioned",
                   "median_permission_age_years", "demand_gap_per_km2",
+                  "demand_gap_per_km2_median", "tightness_median",
+                  "msoas", "msoas_surplus",
                   "tightness_mean", "pct_hectares_public",
                   "pct_sites_with_homes", "homes_capacity_reported",
                   "data_quality_flag", "sites_permitted_not_started"):
@@ -168,6 +170,12 @@ def main() -> None:
     sc.drop(columns=["bname"]).to_json(APP / "scorecard.json",
                                        orient="records", double_precision=2)
     print("scorecard.json written")
+
+    # London-wide medians: the denominators behind "Nx a typical London area".
+    ref_src = PROC / "london_reference.json"
+    if ref_src.exists():
+        (APP / "london_reference.json").write_text(ref_src.read_text())
+        print("london_reference.json written")
 
 
 if __name__ == "__main__":

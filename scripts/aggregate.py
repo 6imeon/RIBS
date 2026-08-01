@@ -8,6 +8,7 @@ against the borough's ten-year target and its demand pressure.
 DUA: demand columns derive from the WhereToBuild MSOA extract (CAGE, Warwick).
 Borough-level aggregates only; no MSOA-level output is written to data/processed.
 """
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -39,13 +40,49 @@ def demand_by_borough() -> pd.DataFrame | None:
     # area-weighted where it matters: gap_per_km2 is a density, so a plain
     # mean over MSOAs is the borough's mean local pressure. `gap` is a count,
     # so it sums. Both are reported.
+    #
+    # Medians are carried alongside the means because London's distribution is
+    # badly skewed by City of London — the mean overstates typical pressure by
+    # ~58%. The app's comparison sentence divides by a London-wide median, so
+    # the borough figure it divides must be a median too or the ratio is
+    # comparing two different kinds of average.
     out = m.groupby("LAD22CD").agg(
         demand_gap_per_km2=("gap_per_km2", "mean"),
+        demand_gap_per_km2_median=("gap_per_km2", "median"),
         demand_gap_total=("gap", "sum"),
         tightness_mean=("tightness", "mean"),
+        tightness_median=("tightness", "median"),
         msoas=("MSOA21CD", "nunique"),
+        # A "surplus" MSOA has supply exceeding demand. Only 3 exist in all of
+        # London, which is itself the finding — 31 of 33 boroughs have none.
+        msoas_surplus=("gap", lambda s: int((s < 0).sum())),
     ).reset_index().rename(columns={"LAD22CD": "gss_code"})
     return out
+
+
+def london_reference(demand: pd.DataFrame | None) -> dict:
+    """London-wide medians — the denominators for the app's 'Nx a typical
+    London area' sentence. Recomputed from source rather than hard-coded so
+    they cannot drift away from the borough figures they are compared against.
+    """
+    src = RESTRICTED / "wheretobuild_msoa_stats.csv"
+    if demand is None or not src.exists():
+        return {}
+    w = pd.read_csv(src, dtype={"msoa_code": str})
+    lu = pd.read_csv(RAW / "msoa11_msoa21_lad22.csv", dtype=str)
+    lu = lu[lu.LAD22CD.str.startswith("E09", na=False)].drop_duplicates("MSOA21CD")
+    m = lu.merge(w, left_on="MSOA21CD", right_on="msoa_code", how="inner")
+    ref = {
+        "median_gap_per_km2": round(float(m["gap_per_km2"].median()), 1),
+        "median_tightness": round(float(m["tightness"].median()), 4),
+        "mean_gap_per_km2": round(float(m["gap_per_km2"].mean()), 1),
+        "msoas": int(len(m)),
+        "msoas_surplus": int((m["gap"] < 0).sum()),
+    }
+    print(f"london reference: median gap/km2 {ref['median_gap_per_km2']}, "
+          f"median tightness {ref['median_tightness']}, "
+          f"{ref['msoas_surplus']}/{ref['msoas']} MSOAs in surplus")
+    return ref
 
 
 def main() -> None:
@@ -121,6 +158,11 @@ def main() -> None:
     dem = demand_by_borough()
     if dem is not None:
         sc = sc.merge(dem, on="gss_code", how="left")
+    # London-wide denominators are scalars, not per-borough facts, so they get
+    # their own file rather than being repeated down 33 identical rows.
+    ref = london_reference(dem)
+    if ref:
+        (PROC / "london_reference.json").write_text(json.dumps(ref, indent=2))
 
     # --- derived shares (null where capacity is unreported) -----------------
     has_homes = sc["pct_sites_with_homes"] > 0

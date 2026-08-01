@@ -58,6 +58,43 @@ button.f:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 .legend-map i{width:9px;height:9px;border-radius:50%;display:inline-block;
   margin-right:5px;vertical-align:-1px}
 .maphint{font-size:12px;color:var(--ink-3)}
+
+/* --- demand lens: mode switch, insight sentence, leaderboard --- */
+.modebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:11px}
+.modelbl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-3)}
+/* Segmented control, not two more pills — the filters above are independent
+   toggles, this is one exclusive choice, and it should not read as a third. */
+.modeswitch{display:inline-flex;border:1px solid var(--rule);border-radius:3px;
+  overflow:hidden;background:var(--card)}
+button.m{background:transparent;border:0;border-right:1px solid var(--rule);
+  color:var(--ink-2);padding:5px 14px;cursor:pointer;font:inherit;font-size:12.5px}
+button.m:last-child{border-right:0}
+button.m:hover{color:var(--ink);background:var(--rule-2)}
+button.m[aria-checked="true"]{background:var(--slate);color:#fff;font-weight:600}
+button.m:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
+.modehint{font-size:12px;color:var(--ink-3);flex:1;min-width:190px}
+.insight{margin-top:12px;padding:13px 15px;border:1px solid var(--rule);
+  border-left:3px solid var(--slate);border-radius:3px;background:var(--card);
+  font-size:15px;line-height:1.45;box-shadow:var(--shadow)}
+.insight b{font-weight:600}
+.insight .mult{font-size:17px;letter-spacing:-.01em}
+/* --ok is already the palette's "this is fine" green; surplus is the one
+   good-news state in the whole tool, so it reuses it rather than adding a hue. */
+.insight.surplus{border-left-color:var(--ok)}
+.insight .cav{display:block;margin-top:5px;font-size:11.5px;color:var(--ink-3)}
+.lbhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  margin-bottom:7px}
+.lbhead h3{font-size:12.5px;margin:0}
+.lbstat{margin:0;font-size:11.5px;color:var(--ink-3);text-align:right}
+#lbtbl{min-width:0;font-size:12.5px;width:100%}
+#lbtbl th{position:sticky;top:0;z-index:2;font-size:10px;padding:8px 9px}
+#lbtbl td{padding:6px 9px}
+#lbtbl tbody tr{cursor:pointer}
+#lbtbl tbody tr:hover{background:var(--amber-soft)}
+#lbtbl tbody tr.sel{background:var(--amber-soft);box-shadow:inset 2px 0 0 var(--amber)}
+#lbtbl .rk{color:var(--ink-3);font-size:11px}
+.lbfoot{margin-top:6px}
 .err{border:1px solid var(--crit);background:color-mix(in srgb,var(--crit) 12%,transparent);
   border-radius:3px;padding:14px 16px;font-size:13.5px}
 .err code{font-family:"IBM Plex Mono",monospace;font-size:12.5px}
@@ -402,6 +439,19 @@ footer a{color:var(--ink-2)}
       <button class="f" data-k="demand" aria-pressed="false">Demand pressure</button>
     </div>
 
+    <!-- Only meaningful while the demand layer is on, so it reveals with it. -->
+    <div class="modebar" id="modebar" hidden>
+      <span class="modelbl">Lens</span>
+      <div class="modeswitch" role="radiogroup" aria-label="Demand lens">
+        <button class="m" data-m="scale" role="radio" aria-checked="true">Scale</button>
+        <button class="m" data-m="scarcity" role="radio" aria-checked="false">Scarcity</button>
+      </div>
+      <span class="modehint" id="modehint">Shortfall per km&sup2; &mdash; where the
+        biggest absolute pressure is.</span>
+    </div>
+
+    <div class="insight" id="insight" hidden></div>
+
     <div class="mapgrid">
       <div id="map"></div>
       <div class="mappanel">
@@ -426,6 +476,26 @@ footer a{color:var(--ink-2)}
           </table>
         </div>
         <p class="maphint">Click a row or a borough to filter. Click again to clear.</p>
+
+        <!-- Demand leaderboard: a separate ranking from the supply table above,
+             shown only when the demand layer is on. -->
+        <div id="lboard" hidden>
+          <div class="lbhead">
+            <h3 id="lbtitle">Demand pressure &mdash; ranked</h3>
+            <p class="lbstat"><b id="lbsurplus">&mdash;</b></p>
+          </div>
+          <div class="mtablewrap">
+            <table id="lbtbl">
+              <thead><tr>
+                <th>#</th><th>Borough</th><th id="lbcol">Gap/km&sup2;</th><th>vs typical</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="maphint lbfoot">City of London excluded &mdash; single-MSOA area
+            not comparable to other boroughs. Borough figures are medians across
+            their MSOAs.</p>
+        </div>
         <div class="dua" id="duaNote" hidden>
           <b>Demand layer &mdash; restricted.</b> Source: WhereToBuild project, CAGE,
           University of Warwick. Data provided by Dr Amrita Kulka and Dr Nikhil Datta.
@@ -446,7 +516,7 @@ footer a{color:var(--ink-2)}
 </footer>
 </div>
 
-<script>const DATA=[{"borough":"Kensington and Chelsea","sites_permitted_not_started":47,"hectares_permitted_not_started":34.21,"homes_min_permitted_not_started":5867.0,"homes_max_permitted_not_started":6298.0,"ten_year_target":4480,"pct_of_target_pns":130.96,"median_permission_age_years":9.46,"demand_gap_per_km2":2250.15,"homes_capacity_reported":true,"sites_total":74,"hectares_total":72.97,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":7983.0,"pct_hectares_public":7.24},{"borough":"Barking and Dagenham","sites_permitted_not_started":35,"hectares_permitted_not_started":436.16,"homes_min_permitted_not_started":23251.0,"homes_max_permitted_not_started":33211.0,"ten_year_target":19440,"pct_of_target_pns":119.6,"median_permission_age_years":6.05,"demand_gap_per_km2":173.33,"homes_capacity_reported":true,"sites_total":86,"hectares_total":614.69,"data_quality_flag":null,"pct_sites_with_homes":68.6,"homes_min_unpermissioned":14168.0,"pct_hectares_public":7.79},{"borough":"Camden","sites_permitted_not_started":138,"hectares_permitted_not_started":39.59,"homes_min_permitted_not_started":10973.0,"homes_max_permitted_not_started":10972.0,"ten_year_target":10380,"pct_of_target_pns":105.71,"median_permission_age_years":8.53,"demand_gap_per_km2":1490.17,"homes_capacity_reported":true,"sites_total":151,"hectares_total":61.25,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":1825.0,"pct_hectares_public":18.24},{"borough":"Lewisham","sites_permitted_not_started":171,"hectares_permitted_not_started":89.68,"homes_min_permitted_not_started":16309.0,"homes_max_permitted_not_started":16388.0,"ten_year_target":16670,"pct_of_target_pns":97.83,"median_permission_age_years":5.12,"demand_gap_per_km2":498.83,"homes_capacity_reported":true,"sites_total":240,"hectares_total":143.3,"data_quality_flag":null,"pct_sites_with_homes":98.75,"homes_min_unpermissioned":7092.0,"pct_hectares_public":5.89},{"borough":"Wandsworth","sites_permitted_not_started":123,"hectares_permitted_not_started":191.65,"homes_min_permitted_not_started":18845.0,"homes_max_permitted_not_started":19639.0,"ten_year_target":19500,"pct_of_target_pns":96.64,"median_permission_age_years":3.93,"demand_gap_per_km2":1070.17,"homes_capacity_reported":true,"sites_total":189,"hectares_total":252.54,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":9456.0,"pct_hectares_public":14.11},{"borough":"Barnet","sites_permitted_not_started":225,"hectares_permitted_not_started":518.66,"homes_min_permitted_not_started":18058.0,"homes_max_permitted_not_started":18058.0,"ten_year_target":23640,"pct_of_target_pns":76.39,"median_permission_age_years":9.37,"demand_gap_per_km2":285.34,"homes_capacity_reported":true,"sites_total":240,"hectares_total":553.56,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":43.33,"homes_min_unpermissioned":null,"pct_hectares_public":2.98},{"borough":"Greenwich","sites_permitted_not_started":83,"hectares_permitted_not_started":118.47,"homes_min_permitted_not_started":18410.0,"homes_max_permitted_not_started":18410.0,"ten_year_target":28240,"pct_of_target_pns":65.19,"median_permission_age_years":9.23,"demand_gap_per_km2":419.73,"homes_capacity_reported":true,"sites_total":94,"hectares_total":129.38,"data_quality_flag":null,"pct_sites_with_homes":97.87,"homes_min_unpermissioned":1231.0,"pct_hectares_public":5.42},{"borough":"Waltham Forest","sites_permitted_not_started":48,"hectares_permitted_not_started":37.42,"homes_min_permitted_not_started":7531.0,"homes_max_permitted_not_started":7531.0,"ten_year_target":12640,"pct_of_target_pns":59.58,"median_permission_age_years":8.92,"demand_gap_per_km2":493.31,"homes_capacity_reported":true,"sites_total":183,"hectares_total":126.76,"data_quality_flag":null,"pct_sites_with_homes":85.25,"homes_min_unpermissioned":7597.0,"pct_hectares_public":42.14},{"borough":"Hounslow","sites_permitted_not_started":133,"hectares_permitted_not_started":61.5,"homes_min_permitted_not_started":10108.0,"homes_max_permitted_not_started":10118.0,"ten_year_target":17820,"pct_of_target_pns":56.72,"median_permission_age_years":6.09,"demand_gap_per_km2":285.58,"homes_capacity_reported":true,"sites_total":173,"hectares_total":64.43,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":230.0,"pct_hectares_public":46.7},{"borough":"Brent","sites_permitted_not_started":114,"hectares_permitted_not_started":61.11,"homes_min_permitted_not_started":11621.0,"homes_max_permitted_not_started":11636.0,"ten_year_target":23250,"pct_of_target_pns":49.98,"median_permission_age_years":6.92,"demand_gap_per_km2":320.31,"homes_capacity_reported":true,"sites_total":213,"hectares_total":218.21,"data_quality_flag":null,"pct_sites_with_homes":86.38,"homes_min_unpermissioned":13410.0,"pct_hectares_public":6.92},{"borough":"Richmond upon Thames","sites_permitted_not_started":35,"hectares_permitted_not_started":12.46,"homes_min_permitted_not_started":1848.0,"homes_max_permitted_not_started":1848.0,"ten_year_target":4110,"pct_of_target_pns":44.96,"median_permission_age_years":2.88,"demand_gap_per_km2":590.0,"homes_capacity_reported":true,"sites_total":57,"hectares_total":30.29,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":509.0,"pct_hectares_public":4.91},{"borough":"Croydon","sites_permitted_not_started":343,"hectares_permitted_not_started":54.6,"homes_min_permitted_not_started":8342.0,"homes_max_permitted_not_started":8342.0,"ten_year_target":20790,"pct_of_target_pns":40.13,"median_permission_age_years":8.21,"demand_gap_per_km2":200.98,"homes_capacity_reported":true,"sites_total":495,"hectares_total":172.8,"data_quality_flag":null,"pct_sites_with_homes":99.8,"homes_min_unpermissioned":9890.0,"pct_hectares_public":17.55},{"borough":"Bexley","sites_permitted_not_started":72,"hectares_permitted_not_started":37.84,"homes_min_permitted_not_started":2506.0,"homes_max_permitted_not_started":2790.0,"ten_year_target":6850,"pct_of_target_pns":36.58,"median_permission_age_years":6.09,"demand_gap_per_km2":221.18,"homes_capacity_reported":true,"sites_total":108,"hectares_total":83.77,"data_quality_flag":null,"pct_sites_with_homes":79.63,"homes_min_unpermissioned":4595.0,"pct_hectares_public":7.65},{"borough":"Merton","sites_permitted_not_started":220,"hectares_permitted_not_started":73.66,"homes_min_permitted_not_started":2987.0,"homes_max_permitted_not_started":2987.0,"ten_year_target":9180,"pct_of_target_pns":32.54,"median_permission_age_years":7.16,"demand_gap_per_km2":445.74,"homes_capacity_reported":true,"sites_total":277,"hectares_total":115.28,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":41.52,"homes_min_unpermissioned":3154.0,"pct_hectares_public":3.53},{"borough":"Islington","sites_permitted_not_started":38,"hectares_permitted_not_started":36.12,"homes_min_permitted_not_started":2431.0,"homes_max_permitted_not_started":2431.0,"ten_year_target":7750,"pct_of_target_pns":31.37,"median_permission_age_years":9.07,"demand_gap_per_km2":1530.59,"homes_capacity_reported":true,"sites_total":77,"hectares_total":82.09,"data_quality_flag":null,"pct_sites_with_homes":93.51,"homes_min_unpermissioned":5564.0,"pct_hectares_public":63.86},{"borough":"Haringey","sites_permitted_not_started":213,"hectares_permitted_not_started":69.4,"homes_min_permitted_not_started":3314.0,"homes_max_permitted_not_started":3444.0,"ten_year_target":15920,"pct_of_target_pns":20.82,"median_permission_age_years":9.63,"demand_gap_per_km2":514.68,"homes_capacity_reported":true,"sites_total":277,"hectares_total":182.36,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":56.32,"homes_min_unpermissioned":null,"pct_hectares_public":10.29},{"borough":"Hackney","sites_permitted_not_started":33,"hectares_permitted_not_started":4.62,"homes_min_permitted_not_started":2736.0,"homes_max_permitted_not_started":2736.0,"ten_year_target":13280,"pct_of_target_pns":20.6,"median_permission_age_years":9.4,"demand_gap_per_km2":1140.11,"homes_capacity_reported":true,"sites_total":38,"hectares_total":6.91,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":18.42,"homes_min_unpermissioned":476.0,"pct_hectares_public":0.0},{"borough":"Lambeth","sites_permitted_not_started":49,"hectares_permitted_not_started":14.1,"homes_min_permitted_not_started":2417.0,"homes_max_permitted_not_started":2417.0,"ten_year_target":13350,"pct_of_target_pns":18.1,"median_permission_age_years":2.61,"demand_gap_per_km2":917.25,"homes_capacity_reported":true,"sites_total":51,"hectares_total":15.62,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":570.0,"pct_hectares_public":28.55},{"borough":"Hammersmith & Fulham","sites_permitted_not_started":17,"hectares_permitted_not_started":11.12,"homes_min_permitted_not_started":2494.0,"homes_max_permitted_not_started":2494.0,"ten_year_target":16090,"pct_of_target_pns":15.5,"median_permission_age_years":8.57,"demand_gap_per_km2":1354.18,"homes_capacity_reported":true,"sites_total":23,"hectares_total":24.32,"data_quality_flag":null,"pct_sites_with_homes":95.65,"homes_min_unpermissioned":null,"pct_hectares_public":2.55},{"borough":"City of London","sites_permitted_not_started":2,"hectares_permitted_not_started":0.22,"homes_min_permitted_not_started":104.0,"homes_max_permitted_not_started":104.0,"ten_year_target":1460,"pct_of_target_pns":7.12,"median_permission_age_years":10.04,"demand_gap_per_km2":1890.94,"homes_capacity_reported":true,"sites_total":2,"hectares_total":0.22,"data_quality_flag":"LOW_SITE_COUNT;","pct_sites_with_homes":100.0,"homes_min_unpermissioned":null,"pct_hectares_public":0.0},{"borough":"Southwark","sites_permitted_not_started":416,"hectares_permitted_not_started":182.41,"homes_min_permitted_not_started":778.0,"homes_max_permitted_not_started":950.0,"ten_year_target":23550,"pct_of_target_pns":3.3,"median_permission_age_years":9.93,"demand_gap_per_km2":856.7,"homes_capacity_reported":true,"sites_total":791,"hectares_total":383.98,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":43.99,"homes_min_unpermissioned":7615.0,"pct_hectares_public":0.0},{"borough":"Newham","sites_permitted_not_started":75,"hectares_permitted_not_started":7.02,"homes_min_permitted_not_started":885.0,"homes_max_permitted_not_started":1368.0,"ten_year_target":32800,"pct_of_target_pns":2.7,"median_permission_age_years":7.33,"demand_gap_per_km2":397.81,"homes_capacity_reported":true,"sites_total":96,"hectares_total":11.54,"data_quality_flag":null,"pct_sites_with_homes":98.96,"homes_min_unpermissioned":612.0,"pct_hectares_public":36.66},{"borough":"Redbridge","sites_permitted_not_started":72,"hectares_permitted_not_started":22.07,"homes_min_permitted_not_started":0.0,"homes_max_permitted_not_started":0.0,"ten_year_target":14090,"pct_of_target_pns":0.0,"median_permission_age_years":10.61,"demand_gap_per_km2":315.48,"homes_capacity_reported":true,"sites_total":188,"hectares_total":128.11,"data_quality_flag":null,"pct_sites_with_homes":76.6,"homes_min_unpermissioned":0.0,"pct_hectares_public":56.58},{"borough":"Westminster","sites_permitted_not_started":208,"hectares_permitted_not_started":52.95,"homes_min_permitted_not_started":0.0,"homes_max_permitted_not_started":0.0,"ten_year_target":9850,"pct_of_target_pns":0.0,"median_permission_age_years":9.45,"demand_gap_per_km2":1795.2,"homes_capacity_reported":true,"sites_total":280,"hectares_total":99.09,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":0.0,"pct_hectares_public":9.21},{"borough":"Bromley","sites_permitted_not_started":76,"hectares_permitted_not_started":29.82,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":7740,"pct_of_target_pns":null,"median_permission_age_years":9.25,"demand_gap_per_km2":228.11,"homes_capacity_reported":false,"sites_total":88,"hectares_total":52.16,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":23.69},{"borough":"Ealing","sites_permitted_not_started":31,"hectares_permitted_not_started":61.22,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":21570,"pct_of_target_pns":null,"median_permission_age_years":9.07,"demand_gap_per_km2":382.95,"homes_capacity_reported":false,"sites_total":70,"hectares_total":111.69,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":10.62},{"borough":"Enfield","sites_permitted_not_started":27,"hectares_permitted_not_started":49.82,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":12460,"pct_of_target_pns":null,"median_permission_age_years":9.55,"demand_gap_per_km2":201.03,"homes_capacity_reported":false,"sites_total":27,"hectares_total":49.82,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":18.22},{"borough":"Harrow","sites_permitted_not_started":84,"hectares_permitted_not_started":80.2,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":8020,"pct_of_target_pns":null,"median_permission_age_years":10.62,"demand_gap_per_km2":185.66,"homes_capacity_reported":false,"sites_total":102,"hectares_total":102.48,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":45.61},{"borough":"Havering","sites_permitted_not_started":63,"hectares_permitted_not_started":38.49,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":12850,"pct_of_target_pns":null,"median_permission_age_years":null,"demand_gap_per_km2":219.6,"homes_capacity_reported":false,"sites_total":114,"hectares_total":104.1,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":26.16},{"borough":"Hillingdon","sites_permitted_not_started":52,"hectares_permitted_not_started":73.35,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":10830,"pct_of_target_pns":null,"median_permission_age_years":9.98,"demand_gap_per_km2":129.22,"homes_capacity_reported":false,"sites_total":203,"hectares_total":180.21,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":0.47},{"borough":"Kingston upon Thames","sites_permitted_not_started":23,"hectares_permitted_not_started":24.89,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":9640,"pct_of_target_pns":null,"median_permission_age_years":5.5,"demand_gap_per_km2":389.74,"homes_capacity_reported":false,"sites_total":49,"hectares_total":64.14,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":0.0},{"borough":"Sutton","sites_permitted_not_started":48,"hectares_permitted_not_started":24.66,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":4690,"pct_of_target_pns":null,"median_permission_age_years":10.75,"demand_gap_per_km2":250.85,"homes_capacity_reported":true,"sites_total":103,"hectares_total":47.99,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":53.4,"homes_min_unpermissioned":2850.0,"pct_hectares_public":38.34},{"borough":"Tower Hamlets","sites_permitted_not_started":7,"hectares_permitted_not_started":4.92,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":34730,"pct_of_target_pns":null,"median_permission_age_years":10.33,"demand_gap_per_km2":1184.97,"homes_capacity_reported":false,"sites_total":26,"hectares_total":95.99,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":0.0}];</script>
+<script>const DATA=[{"borough":"Kensington and Chelsea","sites_permitted_not_started":47,"hectares_permitted_not_started":34.21,"homes_min_permitted_not_started":5867.0,"homes_max_permitted_not_started":6298.0,"ten_year_target":4480,"pct_of_target_pns":130.96,"median_permission_age_years":9.46,"demand_gap_per_km2":2250.15,"homes_capacity_reported":true,"sites_total":74,"hectares_total":72.97,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":7983.0,"pct_hectares_public":7.24,"demand_gap_per_km2_median":2215.02,"tightness_median":8.06,"msoas":21,"msoas_surplus":0},{"borough":"Barking and Dagenham","sites_permitted_not_started":35,"hectares_permitted_not_started":436.16,"homes_min_permitted_not_started":23251.0,"homes_max_permitted_not_started":33211.0,"ten_year_target":19440,"pct_of_target_pns":119.6,"median_permission_age_years":6.05,"demand_gap_per_km2":173.33,"homes_capacity_reported":true,"sites_total":86,"hectares_total":614.69,"data_quality_flag":null,"pct_sites_with_homes":68.6,"homes_min_unpermissioned":14168.0,"pct_hectares_public":7.79,"demand_gap_per_km2_median":175.73,"tightness_median":2.12,"msoas":22,"msoas_surplus":0},{"borough":"Camden","sites_permitted_not_started":138,"hectares_permitted_not_started":39.59,"homes_min_permitted_not_started":10973.0,"homes_max_permitted_not_started":10972.0,"ten_year_target":10380,"pct_of_target_pns":105.71,"median_permission_age_years":8.53,"demand_gap_per_km2":1490.17,"homes_capacity_reported":true,"sites_total":151,"hectares_total":61.25,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":1825.0,"pct_hectares_public":18.24,"demand_gap_per_km2_median":1350.62,"tightness_median":5.33,"msoas":27,"msoas_surplus":0},{"borough":"Lewisham","sites_permitted_not_started":171,"hectares_permitted_not_started":89.68,"homes_min_permitted_not_started":16309.0,"homes_max_permitted_not_started":16388.0,"ten_year_target":16670,"pct_of_target_pns":97.83,"median_permission_age_years":5.12,"demand_gap_per_km2":498.83,"homes_capacity_reported":true,"sites_total":240,"hectares_total":143.3,"data_quality_flag":null,"pct_sites_with_homes":98.75,"homes_min_unpermissioned":7092.0,"pct_hectares_public":5.89,"demand_gap_per_km2_median":521.79,"tightness_median":3.06,"msoas":36,"msoas_surplus":0},{"borough":"Wandsworth","sites_permitted_not_started":123,"hectares_permitted_not_started":191.65,"homes_min_permitted_not_started":18845.0,"homes_max_permitted_not_started":19639.0,"ten_year_target":19500,"pct_of_target_pns":96.64,"median_permission_age_years":3.93,"demand_gap_per_km2":1070.17,"homes_capacity_reported":true,"sites_total":189,"hectares_total":252.54,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":9456.0,"pct_hectares_public":14.11,"demand_gap_per_km2_median":1062.71,"tightness_median":4.9,"msoas":37,"msoas_surplus":0},{"borough":"Barnet","sites_permitted_not_started":225,"hectares_permitted_not_started":518.66,"homes_min_permitted_not_started":18058.0,"homes_max_permitted_not_started":18058.0,"ten_year_target":23640,"pct_of_target_pns":76.39,"median_permission_age_years":9.37,"demand_gap_per_km2":285.34,"homes_capacity_reported":true,"sites_total":240,"hectares_total":553.56,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":43.33,"homes_min_unpermissioned":null,"pct_hectares_public":2.98,"demand_gap_per_km2_median":275.23,"tightness_median":2.3,"msoas":41,"msoas_surplus":0},{"borough":"Greenwich","sites_permitted_not_started":83,"hectares_permitted_not_started":118.47,"homes_min_permitted_not_started":18410.0,"homes_max_permitted_not_started":18410.0,"ten_year_target":28240,"pct_of_target_pns":65.19,"median_permission_age_years":9.23,"demand_gap_per_km2":419.73,"homes_capacity_reported":true,"sites_total":94,"hectares_total":129.38,"data_quality_flag":null,"pct_sites_with_homes":97.87,"homes_min_unpermissioned":1231.0,"pct_hectares_public":5.42,"demand_gap_per_km2_median":333.0,"tightness_median":2.69,"msoas":33,"msoas_surplus":0},{"borough":"Waltham Forest","sites_permitted_not_started":48,"hectares_permitted_not_started":37.42,"homes_min_permitted_not_started":7531.0,"homes_max_permitted_not_started":7531.0,"ten_year_target":12640,"pct_of_target_pns":59.58,"median_permission_age_years":8.92,"demand_gap_per_km2":493.31,"homes_capacity_reported":true,"sites_total":183,"hectares_total":126.76,"data_quality_flag":null,"pct_sites_with_homes":85.25,"homes_min_unpermissioned":7597.0,"pct_hectares_public":42.14,"demand_gap_per_km2_median":509.68,"tightness_median":3.21,"msoas":28,"msoas_surplus":0},{"borough":"Hounslow","sites_permitted_not_started":133,"hectares_permitted_not_started":61.5,"homes_min_permitted_not_started":10108.0,"homes_max_permitted_not_started":10118.0,"ten_year_target":17820,"pct_of_target_pns":56.72,"median_permission_age_years":6.09,"demand_gap_per_km2":285.58,"homes_capacity_reported":true,"sites_total":173,"hectares_total":64.43,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":230.0,"pct_hectares_public":46.7,"demand_gap_per_km2_median":153.15,"tightness_median":1.85,"msoas":28,"msoas_surplus":0},{"borough":"Brent","sites_permitted_not_started":114,"hectares_permitted_not_started":61.11,"homes_min_permitted_not_started":11621.0,"homes_max_permitted_not_started":11636.0,"ten_year_target":23250,"pct_of_target_pns":49.98,"median_permission_age_years":6.92,"demand_gap_per_km2":320.31,"homes_capacity_reported":true,"sites_total":213,"hectares_total":218.21,"data_quality_flag":null,"pct_sites_with_homes":86.38,"homes_min_unpermissioned":13410.0,"pct_hectares_public":6.92,"demand_gap_per_km2_median":223.77,"tightness_median":2.01,"msoas":34,"msoas_surplus":0},{"borough":"Richmond upon Thames","sites_permitted_not_started":35,"hectares_permitted_not_started":12.46,"homes_min_permitted_not_started":1848.0,"homes_max_permitted_not_started":1848.0,"ten_year_target":4110,"pct_of_target_pns":44.96,"median_permission_age_years":2.88,"demand_gap_per_km2":590.0,"homes_capacity_reported":true,"sites_total":57,"hectares_total":30.29,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":509.0,"pct_hectares_public":4.91,"demand_gap_per_km2_median":592.11,"tightness_median":3.85,"msoas":23,"msoas_surplus":0},{"borough":"Croydon","sites_permitted_not_started":343,"hectares_permitted_not_started":54.6,"homes_min_permitted_not_started":8342.0,"homes_max_permitted_not_started":8342.0,"ten_year_target":20790,"pct_of_target_pns":40.13,"median_permission_age_years":8.21,"demand_gap_per_km2":200.98,"homes_capacity_reported":true,"sites_total":495,"hectares_total":172.8,"data_quality_flag":null,"pct_sites_with_homes":99.8,"homes_min_unpermissioned":9890.0,"pct_hectares_public":17.55,"demand_gap_per_km2_median":171.24,"tightness_median":1.95,"msoas":44,"msoas_surplus":0},{"borough":"Bexley","sites_permitted_not_started":72,"hectares_permitted_not_started":37.84,"homes_min_permitted_not_started":2506.0,"homes_max_permitted_not_started":2790.0,"ten_year_target":6850,"pct_of_target_pns":36.58,"median_permission_age_years":6.09,"demand_gap_per_km2":221.18,"homes_capacity_reported":true,"sites_total":108,"hectares_total":83.77,"data_quality_flag":null,"pct_sites_with_homes":79.63,"homes_min_unpermissioned":4595.0,"pct_hectares_public":7.65,"demand_gap_per_km2_median":243.28,"tightness_median":2.47,"msoas":28,"msoas_surplus":0},{"borough":"Merton","sites_permitted_not_started":220,"hectares_permitted_not_started":73.66,"homes_min_permitted_not_started":2987.0,"homes_max_permitted_not_started":2987.0,"ten_year_target":9180,"pct_of_target_pns":32.54,"median_permission_age_years":7.16,"demand_gap_per_km2":445.74,"homes_capacity_reported":true,"sites_total":277,"hectares_total":115.28,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":41.52,"homes_min_unpermissioned":3154.0,"pct_hectares_public":3.53,"demand_gap_per_km2_median":478.49,"tightness_median":3.08,"msoas":25,"msoas_surplus":0},{"borough":"Islington","sites_permitted_not_started":38,"hectares_permitted_not_started":36.12,"homes_min_permitted_not_started":2431.0,"homes_max_permitted_not_started":2431.0,"ten_year_target":7750,"pct_of_target_pns":31.37,"median_permission_age_years":9.07,"demand_gap_per_km2":1530.59,"homes_capacity_reported":true,"sites_total":77,"hectares_total":82.09,"data_quality_flag":null,"pct_sites_with_homes":93.51,"homes_min_unpermissioned":5564.0,"pct_hectares_public":63.86,"demand_gap_per_km2_median":1488.36,"tightness_median":5.62,"msoas":23,"msoas_surplus":0},{"borough":"Haringey","sites_permitted_not_started":213,"hectares_permitted_not_started":69.4,"homes_min_permitted_not_started":3314.0,"homes_max_permitted_not_started":3444.0,"ten_year_target":15920,"pct_of_target_pns":20.82,"median_permission_age_years":9.63,"demand_gap_per_km2":514.68,"homes_capacity_reported":true,"sites_total":277,"hectares_total":182.36,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":56.32,"homes_min_unpermissioned":null,"pct_hectares_public":10.29,"demand_gap_per_km2_median":461.2,"tightness_median":3.0,"msoas":36,"msoas_surplus":0},{"borough":"Hackney","sites_permitted_not_started":33,"hectares_permitted_not_started":4.62,"homes_min_permitted_not_started":2736.0,"homes_max_permitted_not_started":2736.0,"ten_year_target":13280,"pct_of_target_pns":20.6,"median_permission_age_years":9.4,"demand_gap_per_km2":1140.11,"homes_capacity_reported":true,"sites_total":38,"hectares_total":6.91,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":18.42,"homes_min_unpermissioned":476.0,"pct_hectares_public":0.0,"demand_gap_per_km2_median":1010.27,"tightness_median":4.68,"msoas":28,"msoas_surplus":0},{"borough":"Lambeth","sites_permitted_not_started":49,"hectares_permitted_not_started":14.1,"homes_min_permitted_not_started":2417.0,"homes_max_permitted_not_started":2417.0,"ten_year_target":13350,"pct_of_target_pns":18.1,"median_permission_age_years":2.61,"demand_gap_per_km2":917.25,"homes_capacity_reported":true,"sites_total":51,"hectares_total":15.62,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":570.0,"pct_hectares_public":28.55,"demand_gap_per_km2_median":948.31,"tightness_median":4.1,"msoas":35,"msoas_surplus":0},{"borough":"Hammersmith & Fulham","sites_permitted_not_started":17,"hectares_permitted_not_started":11.12,"homes_min_permitted_not_started":2494.0,"homes_max_permitted_not_started":2494.0,"ten_year_target":16090,"pct_of_target_pns":15.5,"median_permission_age_years":8.57,"demand_gap_per_km2":1354.18,"homes_capacity_reported":true,"sites_total":23,"hectares_total":24.32,"data_quality_flag":null,"pct_sites_with_homes":95.65,"homes_min_unpermissioned":null,"pct_hectares_public":2.55,"demand_gap_per_km2_median":1289.37,"tightness_median":5.51,"msoas":25,"msoas_surplus":0},{"borough":"City of London","sites_permitted_not_started":2,"hectares_permitted_not_started":0.22,"homes_min_permitted_not_started":104.0,"homes_max_permitted_not_started":104.0,"ten_year_target":1460,"pct_of_target_pns":7.12,"median_permission_age_years":10.04,"demand_gap_per_km2":1890.94,"homes_capacity_reported":true,"sites_total":2,"hectares_total":0.22,"data_quality_flag":"LOW_SITE_COUNT;","pct_sites_with_homes":100.0,"homes_min_unpermissioned":null,"pct_hectares_public":0.0,"demand_gap_per_km2_median":1890.94,"tightness_median":6.4,"msoas":1,"msoas_surplus":0},{"borough":"Southwark","sites_permitted_not_started":416,"hectares_permitted_not_started":182.41,"homes_min_permitted_not_started":778.0,"homes_max_permitted_not_started":950.0,"ten_year_target":23550,"pct_of_target_pns":3.3,"median_permission_age_years":9.93,"demand_gap_per_km2":856.7,"homes_capacity_reported":true,"sites_total":791,"hectares_total":383.98,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":43.99,"homes_min_unpermissioned":7615.0,"pct_hectares_public":0.0,"demand_gap_per_km2_median":802.38,"tightness_median":3.8,"msoas":33,"msoas_surplus":0},{"borough":"Newham","sites_permitted_not_started":75,"hectares_permitted_not_started":7.02,"homes_min_permitted_not_started":885.0,"homes_max_permitted_not_started":1368.0,"ten_year_target":32800,"pct_of_target_pns":2.7,"median_permission_age_years":7.33,"demand_gap_per_km2":397.81,"homes_capacity_reported":true,"sites_total":96,"hectares_total":11.54,"data_quality_flag":null,"pct_sites_with_homes":98.96,"homes_min_unpermissioned":612.0,"pct_hectares_public":36.66,"demand_gap_per_km2_median":336.5,"tightness_median":2.52,"msoas":37,"msoas_surplus":0},{"borough":"Redbridge","sites_permitted_not_started":72,"hectares_permitted_not_started":22.07,"homes_min_permitted_not_started":0.0,"homes_max_permitted_not_started":0.0,"ten_year_target":14090,"pct_of_target_pns":0.0,"median_permission_age_years":10.61,"demand_gap_per_km2":315.48,"homes_capacity_reported":true,"sites_total":188,"hectares_total":128.11,"data_quality_flag":null,"pct_sites_with_homes":76.6,"homes_min_unpermissioned":0.0,"pct_hectares_public":56.58,"demand_gap_per_km2_median":292.5,"tightness_median":2.65,"msoas":31,"msoas_surplus":0},{"borough":"Westminster","sites_permitted_not_started":208,"hectares_permitted_not_started":52.95,"homes_min_permitted_not_started":0.0,"homes_max_permitted_not_started":0.0,"ten_year_target":9850,"pct_of_target_pns":0.0,"median_permission_age_years":9.45,"demand_gap_per_km2":1795.2,"homes_capacity_reported":true,"sites_total":280,"hectares_total":99.09,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":0.0,"pct_hectares_public":9.21,"demand_gap_per_km2_median":1863.88,"tightness_median":6.5,"msoas":24,"msoas_surplus":0},{"borough":"Bromley","sites_permitted_not_started":76,"hectares_permitted_not_started":29.82,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":7740,"pct_of_target_pns":null,"median_permission_age_years":9.25,"demand_gap_per_km2":228.11,"homes_capacity_reported":false,"sites_total":88,"hectares_total":52.16,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":23.69,"demand_gap_per_km2_median":228.4,"tightness_median":2.24,"msoas":39,"msoas_surplus":0},{"borough":"Ealing","sites_permitted_not_started":31,"hectares_permitted_not_started":61.22,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":21570,"pct_of_target_pns":null,"median_permission_age_years":9.07,"demand_gap_per_km2":382.95,"homes_capacity_reported":false,"sites_total":70,"hectares_total":111.69,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":10.62,"demand_gap_per_km2_median":318.47,"tightness_median":2.45,"msoas":39,"msoas_surplus":0},{"borough":"Enfield","sites_permitted_not_started":27,"hectares_permitted_not_started":49.82,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":12460,"pct_of_target_pns":null,"median_permission_age_years":9.55,"demand_gap_per_km2":201.03,"homes_capacity_reported":false,"sites_total":27,"hectares_total":49.82,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":18.22,"demand_gap_per_km2_median":176.28,"tightness_median":1.97,"msoas":36,"msoas_surplus":0},{"borough":"Harrow","sites_permitted_not_started":84,"hectares_permitted_not_started":80.2,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":8020,"pct_of_target_pns":null,"median_permission_age_years":10.62,"demand_gap_per_km2":185.66,"homes_capacity_reported":false,"sites_total":102,"hectares_total":102.48,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":45.61,"demand_gap_per_km2_median":169.64,"tightness_median":1.97,"msoas":30,"msoas_surplus":0},{"borough":"Havering","sites_permitted_not_started":63,"hectares_permitted_not_started":38.49,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":12850,"pct_of_target_pns":null,"median_permission_age_years":null,"demand_gap_per_km2":219.6,"homes_capacity_reported":false,"sites_total":114,"hectares_total":104.1,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":26.16,"demand_gap_per_km2_median":207.64,"tightness_median":2.57,"msoas":30,"msoas_surplus":1},{"borough":"Hillingdon","sites_permitted_not_started":52,"hectares_permitted_not_started":73.35,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":10830,"pct_of_target_pns":null,"median_permission_age_years":9.98,"demand_gap_per_km2":129.22,"homes_capacity_reported":false,"sites_total":203,"hectares_total":180.21,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":0.47,"demand_gap_per_km2_median":122.43,"tightness_median":1.84,"msoas":32,"msoas_surplus":2},{"borough":"Kingston upon Thames","sites_permitted_not_started":23,"hectares_permitted_not_started":24.88,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":9640,"pct_of_target_pns":null,"median_permission_age_years":5.5,"demand_gap_per_km2":389.74,"homes_capacity_reported":false,"sites_total":49,"hectares_total":64.14,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":0.0,"demand_gap_per_km2_median":470.46,"tightness_median":3.39,"msoas":20,"msoas_surplus":0},{"borough":"Sutton","sites_permitted_not_started":48,"hectares_permitted_not_started":24.66,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":4690,"pct_of_target_pns":null,"median_permission_age_years":10.75,"demand_gap_per_km2":250.85,"homes_capacity_reported":true,"sites_total":103,"hectares_total":47.99,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":53.4,"homes_min_unpermissioned":2850.0,"pct_hectares_public":38.34,"demand_gap_per_km2_median":253.6,"tightness_median":2.32,"msoas":24,"msoas_surplus":0},{"borough":"Tower Hamlets","sites_permitted_not_started":7,"hectares_permitted_not_started":4.92,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":34730,"pct_of_target_pns":null,"median_permission_age_years":10.33,"demand_gap_per_km2":1184.97,"homes_capacity_reported":false,"sites_total":26,"hectares_total":95.99,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":0.0,"demand_gap_per_km2_median":1175.34,"tightness_median":4.68,"msoas":32,"msoas_surplus":0}];</script>
 <script>
 const fmt=(n,d=0)=>n==null?"–":Number(n).toLocaleString("en-GB",
   {minimumFractionDigits:d,maximumFractionDigits:d});
@@ -601,6 +671,42 @@ document.getElementById("tab-map").onclick=()=>show("map");
 /* ---------------- map ---------------- */
 const F={pns:true,unperm:false,deliverable:false,public:false,demand:false};
 let SITES=[],BOR=null,sel=null,msort="pct_of_target_pns",masc=false;
+// Scale = shortfall density (gap/km2). Scarcity = how stretched supply is.
+// Scale leads because it answers "where is the biggest problem", which is the
+// question a councillor actually arrives with.
+let MODE="scale";
+// London-wide medians, loaded from data/london_reference.json. Medians, not
+// means: City of London drags the London mean 58% above the median, so a
+// mean-based "typical area" would overstate every comparison.
+let REF=null;
+const LENS={
+  scale:{
+    col:"demand_gap_per_km2_median", ref:"median_gap_per_km2",
+    label:"Gap/km²", title:"Shortfall density — ranked",
+    hint:"Shortfall per km² — where the biggest absolute pressure is.",
+    dp:0,
+    // "0.3x bigger" is a contradiction — below 1.0 the comparison has to flip
+    // to "smaller" or the sentence says the opposite of the number.
+    say:(p,x)=>x>=1
+      ? `<b>${p}</b> has a housing shortfall about <b class="mult">${x}×</b>
+         bigger than a typical London area of the same size.`
+      : `<b>${p}</b> has a housing shortfall about
+         <b class="mult">${(1/x).toFixed(1)}×</b> smaller than a typical London
+         area of the same size &mdash; but still a shortfall.`,
+  },
+  scarcity:{
+    col:"tightness_median", ref:"median_tightness",
+    label:"Tightness", title:"Market scarcity — ranked",
+    hint:"How stretched the available homes are — how squeezed it feels.",
+    dp:2,
+    say:(p,x)=>x>=1
+      ? `In <b>${p}</b>, available homes are stretched about
+         <b class="mult">${x}×</b> tighter than a typical London area.`
+      : `In <b>${p}</b>, available homes are about
+         <b class="mult">${(1/x).toFixed(1)}×</b> less stretched than a typical
+         London area.`,
+  },
+};
 const CSSV=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
 function initMap(){
@@ -682,14 +788,85 @@ function initMap(){
     if(v==null) return "transparent";
     return `color-mix(in srgb, ${CSSV("--slate")} ${Math.round(12+Math.min(1,v/max)*66)}%, transparent)`;
   }
+
+  /* ---- demand lens: insight sentence + leaderboard ---- */
+
+  // Ratio of a borough to the London median on the active lens.
+  function multiple(p){
+    if(!REF) return null;
+    const v=p[LENS[MODE].col], d=REF[LENS[MODE].ref];
+    if(v==null||!d) return null;
+    return v/d;
+  }
+  function drawInsight(){
+    const el=document.getElementById("insight");
+    if(!F.demand||!REF){ el.hidden=true; return; }
+    const p=sel?DATA.find(r=>r.borough===sel):null;
+    if(!p){
+      el.hidden=false; el.className="insight";
+      el.innerHTML=`<b>${REF.msoas-REF.msoas_surplus} of ${REF.msoas}</b> London
+        neighbourhoods have more housing demand than supply.
+        <span class="cav">Click a borough for its comparison.</span>`;
+      return;
+    }
+    const x=multiple(p);
+    if(x==null){
+      el.hidden=false; el.className="insight";
+      el.innerHTML=`<b>${p.borough}</b> &mdash; demand figures not available.`;
+      return;
+    }
+    el.hidden=false;
+    // A borough whose MSOAs are in surplus can't take a "shortfall multiplier":
+    // the ratio would be negative and the sentence would be nonsense.
+    const surplus=MODE==="scale"&&p.demand_gap_per_km2_median!=null
+      &&p.demand_gap_per_km2_median<0;
+    if(surplus){
+      el.className="insight surplus";
+      el.innerHTML=`<b>${p.borough}</b> currently has more supply than demand
+        relative to a typical London area.`;
+    }else{
+      el.className="insight";
+      el.innerHTML=LENS[MODE].say(p.borough,x.toFixed(1));
+    }
+    if(p.msoas_surplus>0)
+      el.innerHTML+=`<span class="cav">${p.msoas_surplus} of ${p.msoas}
+        neighbourhoods here are in surplus &mdash; rare in London.</span>`;
+  }
+  function drawBoard(){
+    const box=document.getElementById("lboard");
+    if(!F.demand||!REF){ box.hidden=true; return; }
+    box.hidden=false;
+    const L=LENS[MODE];
+    document.getElementById("lbtitle").textContent=L.title;
+    document.getElementById("lbcol").innerHTML=L.label;
+    const zero=DATA.filter(r=>r.msoas_surplus===0).length;
+    document.getElementById("lbsurplus").textContent=
+      `${zero} of ${DATA.length} boroughs have zero areas of surplus`;
+    // City of London is one MSOA — an outlier by construction, not a borough
+    // comparable to the other 32. It stays on the map, just not in the ranking.
+    const rows=DATA.filter(r=>r.borough!=="City of London"&&r[L.col]!=null)
+      .sort((a,b)=>b[L.col]-a[L.col]);
+    document.querySelector("#lbtbl tbody").innerHTML=rows.map((r,i)=>{
+      const x=multiple(r);
+      return `<tr class="${sel===r.borough?"sel":""}" data-b="${r.borough}">
+        <td class="mono rk">${i+1}</td>
+        <td>${r.borough}</td>
+        <td class="mono">${fmt(r[L.col],L.dp)}</td>
+        <td class="mono">${x==null?"—":x.toFixed(1)+"×"}</td>
+      </tr>`;
+    }).join("");
+    document.querySelectorAll("#lbtbl tbody tr").forEach(tr=>
+      tr.onclick=()=>select(sel===tr.dataset.b?null:tr.dataset.b));
+  }
   function drawBoundaries(){
     boundaryLayer.clearLayers();
-    const maxD=Math.max(...DATA.map(r=>r.demand_gap_per_km2||0));
+    const dcol=LENS[MODE].col;
+    const maxD=Math.max(...DATA.map(r=>r[dcol]||0));
     L.geoJSON(BOR,{style:f=>{
         const p=f.properties, on=sel===p.borough;
         return {color:on?CSSV("--amber"):CSSV("--ink-3"),
           weight:on?2.4:1,opacity:on?1:.55,
-          fillColor:F.demand?demandColor(p.demand_gap_per_km2,maxD):CSSV("--ink-3"),
+          fillColor:F.demand?demandColor(p[dcol],maxD):CSSV("--ink-3"),
           fillOpacity:F.demand?1:(on?.12:.04)};
       },
       onEachFeature:(f,l)=>{
@@ -702,7 +879,7 @@ function initMap(){
       }}).addTo(boundaryLayer);
   }
   function select(b){
-    sel=b; drawBoundaries(); drawSites(); mtable();
+    sel=b; drawBoundaries(); drawSites(); mtable(); drawInsight(); drawBoard();
     if(b){const f=BOR.features.find(f=>f.properties.borough===b);
       if(f) map.fitBounds(L.geoJSON(f).getBounds(),{padding:[30,30]});}
     else fitLondon();
@@ -738,16 +915,30 @@ function initMap(){
     const k=b.dataset.k; F[k]=!F[k];
     b.setAttribute("aria-pressed",F[k]);
     document.getElementById("duaNote").hidden=!F.demand;
-    drawBoundaries(); drawSites();
+    // The lens switch only means anything while the demand layer is drawn.
+    document.getElementById("modebar").hidden=!F.demand;
+    drawBoundaries(); drawSites(); drawInsight(); drawBoard();
+  });
+  // One switch drives the choropleth, the ranking and the sentence together —
+  // they must never disagree about which lens is active.
+  document.querySelectorAll("button.m").forEach(b=>b.onclick=()=>{
+    MODE=b.dataset.m;
+    document.querySelectorAll("button.m").forEach(o=>
+      o.setAttribute("aria-checked",o.dataset.m===MODE));
+    document.getElementById("modehint").textContent=LENS[MODE].hint;
+    drawBoundaries(); drawInsight(); drawBoard();
   });
 
   mtable();
   Promise.all([
     fetch("data/boroughs.json").then(r=>r.json()),
     fetch("data/sites.json").then(r=>r.json()),
-  ]).then(([bor,si])=>{
-    BOR=bor; SITES=si;
-    drawBoundaries(); drawSites();
+    // Optional: absent when the pipeline runs without the restricted extract,
+    // in which case the demand lens degrades to the plain choropleth.
+    fetch("data/london_reference.json").then(r=>r.ok?r.json():null).catch(()=>null),
+  ]).then(([bor,si,ref])=>{
+    BOR=bor; SITES=si; REF=ref;
+    drawBoundaries(); drawSites(); drawInsight(); drawBoard();
     fitLondon();
   }).catch(e=>{
     console.error("map init failed:",e);

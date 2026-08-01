@@ -30,6 +30,16 @@ and the median permission has been sitting there for **nine and a half years**.
 The argument this supports: in these boroughs the binding constraint is not
 identifying land, and not granting permission. Both have already happened.
 
+### Demand is near-universal
+
+> **31 of 33 London boroughs contain no neighbourhood at all where housing supply
+> exceeds demand.** Only 3 of London's 982 MSOAs are in surplus — 2 in Hillingdon,
+> 1 in Havering.
+
+This is why the tool ranks boroughs by *how much* pressure they carry rather than
+*whether* they have any. Kensington and Chelsea's shortfall density is **5.8× the London
+median**; the least-pressured borough, Hillingdon, still runs a shortfall.
+
 ## Run it
 
 ```bash
@@ -78,7 +88,25 @@ when a site is completed or drops off the register, so an empty `end-date` on a
 permissioned site means permission exists and the homes are not built.
 
 **Demand:** WhereToBuild MSOA extract → MSOA21 → borough (982/982 London MSOAs matched,
-100% coverage). Borough figure is the mean of `gap_per_km2` across its MSOAs.
+100% coverage). Both the mean and the **median** of `gap_per_km2` across each borough's
+MSOAs are published.
+
+The app's demand lens uses the **median**, not the mean. London's distribution is badly
+skewed — the London-wide mean `gap_per_km2` is **606** against a median of **383**, a 58%
+overstatement driven mainly by City of London, a single-MSOA "borough". Comparing a
+borough to a mean-based "typical area" would inflate every figure in the tool.
+
+**Demand lens (two views of the same data):**
+- **Scale** — `gap_per_km2`, shortfall per km². Where the biggest absolute pressure is.
+- **Scarcity** — `tightness`, how stretched the available homes are.
+
+The lens drives the choropleth, the ranking and the comparison sentence together. The
+sentence expresses a borough as a multiple of the London median; below 1.0 it inverts its
+wording ("3.3× smaller … but still a shortfall") rather than reporting "0.3× bigger",
+which states the opposite of the number.
+
+**City of London is excluded from the demand ranking** — one MSOA is not comparable to
+boroughs of 30+. It remains on the map and in the supply tables.
 
 ### Permission status had to be cleaned
 
@@ -143,6 +171,13 @@ Additional limits:
   this: each popup leads with the site's **canonical `planning.data.gov.uk/entity/…`
   record**, which always resolves, and any council link is shown beneath it and labelled
   "whole-borough page" when it cannot identify the individual site.
+- **Per-MSOA surplus shading is deliberately not built.** `ui-changes-spec.md` Feature 4
+  asks for MSOA-level colouring to distinguish surplus from shortage areas. Drawing 982
+  London MSOAs individually would publish MSOA-level records, which is exactly what the
+  borough-only aggregation exists to prevent under the data use agreement — it needs
+  organiser sign-off first. It would also carry little signal: **only 3 of 982 London
+  MSOAs are in surplus.** The "31 of 33 boroughs" stat beside the ranking conveys the
+  same finding at borough resolution.
 - **Two Development Corporations are excluded.** London Plan Table 4.1 lists 35 rows,
   including LLDC (21,540) and OPDC (13,670). Their targets sit geographically inside
   boroughs, so including them would double-count. Only the 33 boroughs are scored.
