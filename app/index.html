@@ -294,6 +294,23 @@ tbody tr:nth-child(even){background:color-mix(in srgb,var(--rule-2) 42%,transpar
 .dua{border:1px solid var(--amber);background:var(--amber-soft);border-radius:3px;
   padding:16px 18px;font-size:13.5px;color:var(--ink-2)}
 .dua b{color:var(--amber-ink)}
+/* Deliberately NOT the .dua amber box. That one means "legal restriction on this
+   data"; this one means "here is how to read the layer". Same panel, different
+   kind of warning, so it takes the neutral rule/card treatment instead. */
+.oppnote{border:1px solid var(--rule);background:var(--card);border-radius:3px;
+  padding:13px 15px;font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+.oppnote>b{color:var(--ink)}
+/* The two caveats a reader is most likely to get wrong, so they sit outside the
+   fold with a rule to separate them from the definition above. */
+.oppwarn{margin-top:9px;padding-top:9px;border-top:1px solid var(--rule-2)}
+.oppwarn b{color:var(--ink)}
+.oppnote details{margin-top:9px;padding-top:9px;border-top:1px solid var(--rule-2)}
+.oppnote summary{cursor:pointer;color:var(--ink);font-weight:600;
+  list-style-position:outside}
+.oppnote summary:hover{color:var(--amber-ink)}
+.oppnote ul.tight{font-size:12.5px;margin-top:7px}
+.oppnote ul.tight li{margin-bottom:7px}
+.oppnote .all3{font-size:12px}
 ul.tight{margin:8px 0 0;padding-left:18px;font-size:14.5px;color:var(--ink-2)}
 ul.tight li{margin-bottom:6px}
 footer{padding:30px 0 60px;font-size:12.5px;color:var(--ink-3)}
@@ -547,15 +564,16 @@ footer a{color:var(--ink-2)}
     </div>
     <div>
       <ul class="tight">
-        <li><b>The threshold is a choice, not a fact.</b> It is set at the median.
-        Moving it would change who qualifies — at a stricter cut the list shortens
-        toward Kensington &amp; Chelsea alone. <b>Waltham Forest sits exactly on the
-        line</b> at the 50th percentile for demand: it qualifies here, and would drop
-        out under any stricter cut. Read the bottom of this table as provisional.</li>
+        <li><b>The threshold is a choice, not a fact.</b> The badge is set at the
+        median. Moving it would change who earns one — at a stricter cut the badge
+        shortens toward Kensington &amp; Chelsea alone. <b>Waltham Forest sits exactly
+        on the line</b> at the 50th percentile for demand: it takes a badge here, and
+        would lose it under any stricter cut.</li>
         <li><b>Barking &amp; Dagenham is the case to argue about.</b> It holds the
-        largest stalled permitted area in London and scores nothing here, because
-        demand sits in the bottom 5%. Whether that is a reason to deprioritise it or
-        the opposite is a political question, not a statistical one.</li>
+        largest stalled permitted area in London and ranks fifth on the index, but
+        takes no badge, because demand sits in the bottom 15%. Whether that argues for
+        deprioritising it, or for building where land is actually available, is a
+        political question rather than a statistical one.</li>
       </ul>
     </div>
   </div>
@@ -617,6 +635,51 @@ footer a{color:var(--ink-2)}
           <span><i class="ramp"></i>Opportunity index &mdash; low to high</span>
           <span><span class="hatchkey"></span>Not scored (no published capacity)</span>
           <span><span class="all3" style="font-size:12px">&#9679;</span>&nbsp;Clears all three axes</span>
+        </div>
+        <!-- The colour key above says what the shades ARE; this says what they
+             MEAN, and what they do not mean. Reveals with the layer, like the
+             DUA note below does for demand. Details stay collapsed so the map
+             panel is not dominated by prose, but the two hardest-to-see
+             caveats (missing vs low, average hiding an axis) are outside the
+             fold — those are the ones a reader would otherwise get wrong. -->
+        <div class="oppnote" id="oppnote" hidden>
+          <b>What this shows.</b> Three signals combined: stalled capacity as a
+          share of the ten-year target, demand pressure, and the absolute number
+          of homes held up. Each is percentile-ranked across the 24 boroughs that
+          publish capacity, then averaged.
+          <div class="oppwarn">
+            <b>A missing score is not a low score.</b> The 9 hatched boroughs
+            publish no capacity at all. They are not at the bottom of the ranking
+            &mdash; they are not in it, and that is a gap in what councils publish,
+            not a finding about those boroughs.
+          </div>
+          <div class="oppwarn">
+            <b>An average can hide a weak axis.</b> Barking &amp; Dagenham scores
+            69.4 &mdash; fifth &mdash; on capacity and raw homes, while its demand
+            sits in the bottom 15%. The <span class="all3">&#9679;</span> badge is
+            what separates "averages well" from "strong on all three".
+          </div>
+          <details>
+            <summary>How to read this &mdash; and how not to</summary>
+            <ul class="tight">
+              <li><b>A high index is not "build here".</b> It means three
+              independent signals agree this borough is worth a planner's
+              attention first. The decision still needs local knowledge this
+              dataset does not contain.</li>
+              <li><b>The threshold is a choice, not a fact.</b> The badge is set
+              at the median. Moving it would change who qualifies &mdash; at a
+              stricter cut the badge shortens toward Kensington &amp; Chelsea
+              alone. <b>Waltham Forest sits exactly on the line</b> at the 50th
+              percentile for demand: it qualifies here, and would drop out under
+              any stricter cut.</li>
+              <li><b>Barking &amp; Dagenham is the case to argue about.</b> It
+              holds the largest stalled permitted area in London and takes no
+              badge, because demand sits in the bottom 15%. Whether that argues
+              for deprioritising it, or for building where land is actually
+              available, is a political question rather than a statistical
+              one.</li>
+            </ul>
+          </details>
         </div>
         <div class="mtablewrap">
           <table id="mtbl">
@@ -1287,6 +1350,7 @@ function initMap(){
     }
     const oppOn=F.opp&&!F.demand;
     document.getElementById("opplegend").hidden=!oppOn;
+    document.getElementById("oppnote").hidden=!oppOn;
     document.getElementById("maplegend").hidden=oppOn;
     drawBoundaries(); drawMsoaLayer(); drawSites(); drawInsight(); drawBoard();
   });
