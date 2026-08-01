@@ -3,281 +3,742 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>London Land Ledger — permitted, unstarted</title>
 <link rel="stylesheet" href="vendor/leaflet.css">
-<style>
-  :root{
-    --bg:#0e1116; --panel:#161b22; --line:#2a323d; --ink:#e6edf3; --dim:#8b98a5;
-    --pns:#f0883e;      /* permitted, not started */
-    --unperm:#58a6ff;   /* identified, no permission */
-    --pending:#a371f7; --unknown:#484f58; --good:#3fb950;
-  }
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
-    font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
-  #wrap{display:flex;height:100vh;overflow:hidden}
-  #side{width:470px;min-width:470px;background:var(--panel);border-right:1px solid var(--line);
-    display:flex;flex-direction:column;overflow:hidden}
-  #map{flex:1;background:#0b0e13}
-  header{padding:14px 16px;border-bottom:1px solid var(--line)}
-  h1{margin:0 0 3px;font-size:16px;letter-spacing:-.2px}
-  .sub{color:var(--dim);font-size:12px}
-  .headline{padding:12px 16px;border-bottom:1px solid var(--line);background:#12171e}
-  .big{font-size:26px;font-weight:650;color:var(--pns);letter-spacing:-.5px}
-  .big small{font-size:12px;color:var(--dim);font-weight:400;letter-spacing:0}
-  .controls{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;
-    flex-wrap:wrap;gap:6px;align-items:center}
-  .controls label{font-size:11px;color:var(--dim);width:100%;margin-bottom:2px;
-    text-transform:uppercase;letter-spacing:.6px}
-  button.f{background:#21262d;border:1px solid var(--line);color:var(--ink);
-    padding:4px 9px;border-radius:20px;cursor:pointer;font-size:12px}
-  button.f.on{background:var(--pns);border-color:var(--pns);color:#0e1116;font-weight:600}
-  button.f.on[data-k="unperm"]{background:var(--unperm);border-color:var(--unperm)}
-  #tablewrap{flex:1;overflow:auto}
-  table{width:100%;border-collapse:collapse;font-size:12px}
-  th{position:sticky;top:0;background:#1c222b;text-align:right;padding:7px 8px;
-    font-weight:600;color:var(--dim);cursor:pointer;white-space:nowrap;
-    border-bottom:1px solid var(--line);font-size:11px}
-  th:first-child{text-align:left}
-  th:hover{color:var(--ink)}
-  td{padding:6px 8px;text-align:right;border-bottom:1px solid #1f252e;white-space:nowrap}
-  td:first-child{text-align:left;font-weight:500}
-  tr:hover{background:#1b212a;cursor:pointer}
-  tr.sel{background:#243040;outline:1px solid var(--pns)}
-  .flag{color:var(--dim);font-size:10px;cursor:help}
-  .bar{display:inline-block;height:3px;background:var(--pns);vertical-align:middle;
-    margin-left:5px;border-radius:2px}
-  footer{padding:9px 16px;border-top:1px solid var(--line);font-size:10px;color:var(--dim)}
-  .legend{position:absolute;bottom:18px;right:12px;background:rgba(22,27,34,.95);
-    border:1px solid var(--line);border-radius:7px;padding:9px 11px;z-index:600;font-size:11px}
-  .legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px}
-  .leaflet-popup-content-wrapper{background:var(--panel);color:var(--ink);border-radius:7px}
-  .leaflet-popup-tip{background:var(--panel)}
-  .leaflet-popup-content{margin:11px 13px;font-size:12px;line-height:1.5}
-  .pop b{font-size:13px} .pop hr{border:0;border-top:1px solid var(--line);margin:6px 0}
-  .pop .k{color:var(--dim)}
-  .dua{background:#2d1e14;border:1px solid #6b4423;color:#f0c8a0;padding:7px 10px;
-    font-size:10.5px;border-radius:5px;margin:9px 16px}
-  #btnCsv{background:transparent;border:1px solid var(--line);color:var(--dim);
-    padding:3px 8px;border-radius:5px;cursor:pointer;font-size:11px}
-  #btnCsv:hover{color:var(--ink);border-color:var(--dim)}
+<style>*{margin:0;padding:0}img,svg,canvas{display:block;max-width:100%}
+/* ---------- view switch ---------- */
+.viewnav{display:flex;gap:2px;margin-top:18px;border-bottom:1px solid var(--rule)}
+.viewnav button{appearance:none;background:none;border:0;border-bottom:2px solid transparent;
+  color:var(--ink-3);font:inherit;font-size:13px;font-weight:600;letter-spacing:.04em;
+  text-transform:uppercase;padding:9px 2px;margin-right:26px;cursor:pointer}
+.viewnav button:hover{color:var(--ink-2)}
+.viewnav button[aria-selected="true"]{color:var(--amber-ink);border-bottom-color:var(--amber)}
+.viewnav button:focus-visible{outline:2px solid var(--amber);outline-offset:3px;border-radius:2px}
+[hidden]{display:none !important}
+
+/* ---------- map view ---------- */
+.mapgrid{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:22px;
+  align-items:start;margin-top:26px}
+#map{height:min(74vh,720px);border:1px solid var(--rule);border-radius:3px;
+  background:var(--rule-2);box-shadow:var(--shadow)}
+.mappanel{display:flex;flex-direction:column;gap:14px;position:sticky;top:16px}
+.filters{display:flex;flex-wrap:wrap;gap:7px}
+button.f{background:var(--card);border:1px solid var(--rule);color:var(--ink-2);
+  padding:5px 11px;border-radius:20px;cursor:pointer;font:inherit;font-size:12.5px}
+button.f:hover{border-color:var(--ink-3);color:var(--ink)}
+button.f[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);
+  color:#fff;font-weight:600}
+button.f:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.mapstat{border:1px solid var(--rule);border-radius:3px;background:var(--card);
+  padding:12px 14px;box-shadow:var(--shadow)}
+.mapstat .v{font-size:21px;letter-spacing:-.02em}
+.mapstat .n{font-size:12.5px;color:var(--ink-3)}
+.mtablewrap{border:1px solid var(--rule);border-radius:3px;background:var(--card);
+  box-shadow:var(--shadow);max-height:420px;overflow:auto}
+#mtbl{min-width:0;font-size:12.5px}
+#mtbl th{position:sticky;top:0;z-index:2;font-size:10px;padding:8px 9px}
+#mtbl td .cell{padding:6px 9px}
+#mtbl tbody tr{cursor:pointer}
+#mtbl tbody tr:hover{background:var(--amber-soft)}
+#mtbl tbody tr.sel{background:var(--amber-soft);
+  box-shadow:inset 2px 0 0 var(--amber)}
+.legend-map{display:flex;flex-wrap:wrap;gap:12px;font-size:11.5px;color:var(--ink-2)}
+.legend-map i{width:9px;height:9px;border-radius:50%;display:inline-block;
+  margin-right:5px;vertical-align:-1px}
+.maphint{font-size:12px;color:var(--ink-3)}
+.err{border:1px solid var(--crit);background:color-mix(in srgb,var(--crit) 12%,transparent);
+  border-radius:3px;padding:14px 16px;font-size:13.5px}
+.err code{font-family:"IBM Plex Mono",monospace;font-size:12.5px}
+/* leaflet on paper */
+.leaflet-container{background:var(--rule-2);font:inherit}
+.leaflet-popup-content-wrapper,.leaflet-tooltip{background:var(--card);color:var(--ink);
+  border:1px solid var(--rule);border-radius:3px;box-shadow:var(--shadow)}
+.leaflet-popup-tip{background:var(--card)}
+.leaflet-tooltip{padding:6px 9px;font-size:12.5px}
+.leaflet-tooltip:before{display:none}
+.leaflet-popup-content{margin:11px 13px;font-size:12.5px;line-height:1.5}
+.pop b{font-size:13.5px}
+.pop hr{border:0;border-top:1px solid var(--rule);margin:7px 0}
+.pop .k{color:var(--ink-3)}
+.leaflet-control-zoom a{background:var(--card);color:var(--ink);border-color:var(--rule)}
+.leaflet-control-attribution{background:color-mix(in srgb,var(--card) 86%,transparent);
+  color:var(--ink-3);font-size:10px}
+.leaflet-control-attribution a{color:var(--ink-2)}
+@media (max-width:900px){
+  .mapgrid{grid-template-columns:1fr}
+  .mappanel{position:static}
+  #map{height:56vh}
+}
 </style>
+<title>London Land Ledger — permitted, unstarted</title>
+<style>
+:root{
+  --paper:#FAF7F1; --ink:#1A1712; --ink-2:#4A4237; --ink-3:#7A7264;
+  --rule:#DED6C8; --rule-2:#EDE7DC; --card:#FFFFFF;
+  --amber:#C86A1E; --amber-soft:#F2E2D0; --amber-ink:#9A4E10;
+  --slate:#3E6B8C; --slate-soft:#DCE6EE;
+  --crit:#A32E1F; --ok:#4B6B3A;
+  --shadow:0 1px 2px rgba(26,23,18,.06),0 8px 24px -12px rgba(26,23,18,.14);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#12100D; --ink:#F2EDE4; --ink-2:#B8AF9F; --ink-3:#8A8172;
+    --rule:#2E2820; --rule-2:#221D17; --card:#1A1611;
+    --amber:#E08A3C; --amber-soft:#3A2818; --amber-ink:#F0A662;
+    --slate:#6E9CBE; --slate-soft:#1C2A36;
+    --crit:#D9634E; --ok:#7FA05F;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#12100D; --ink:#F2EDE4; --ink-2:#B8AF9F; --ink-3:#8A8172;
+  --rule:#2E2820; --rule-2:#221D17; --card:#1A1611;
+  --amber:#E08A3C; --amber-soft:#3A2818; --amber-ink:#F0A662;
+  --slate:#6E9CBE; --slate-soft:#1C2A36;
+  --crit:#D9634E; --ok:#7FA05F;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
+}
+:root[data-theme="light"]{
+  --paper:#FAF7F1; --ink:#1A1712; --ink-2:#4A4237; --ink-3:#7A7264;
+  --rule:#DED6C8; --rule-2:#EDE7DC; --card:#FFFFFF;
+  --amber:#C86A1E; --amber-soft:#F2E2D0; --amber-ink:#9A4E10;
+  --slate:#3E6B8C; --slate-soft:#DCE6EE;
+  --crit:#A32E1F; --ok:#4B6B3A;
+  --shadow:0 1px 2px rgba(26,23,18,.06),0 8px 24px -12px rgba(26,23,18,.14);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:"IBM Plex Sans","Segoe UI",system-ui,-apple-system,sans-serif;
+  font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;
+}
+.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-variant-numeric:tabular-nums}
+.wrap{max-width:1120px;margin:0 auto;padding:0 28px}
+h1,h2,h3{font-family:"Instrument Serif","Iowan Old Style","Palatino Linotype",Georgia,serif;
+  font-weight:400;text-wrap:balance;letter-spacing:-.01em;margin:0}
+
+/* ---------- masthead ---------- */
+.mast{border-bottom:1.5px solid var(--ink);padding:26px 0 14px;margin-bottom:0}
+.mast .row{display:flex;justify-content:space-between;align-items:baseline;gap:20px;flex-wrap:wrap}
+.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);
+  font-weight:600}
+.mast h1{font-size:clamp(34px,5.2vw,56px);line-height:1.02;margin:6px 0 0}
+.mast .sub{color:var(--ink-2);font-size:15.5px;max-width:60ch;margin-top:10px}
+
+/* ---------- thesis ---------- */
+.thesis{padding:34px 0 8px;border-bottom:1px solid var(--rule)}
+.figure-row{display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap}
+.bignum{font-family:"Instrument Serif",Georgia,serif;font-size:clamp(56px,9vw,96px);
+  line-height:.92;color:var(--amber);letter-spacing:-.02em}
+.bignum .u{font-size:.34em;color:var(--ink-2);letter-spacing:0}
+.thesis .lede{font-size:19px;line-height:1.5;max-width:44ch;color:var(--ink)}
+.thesis .lede b{color:var(--amber-ink);font-weight:600}
+.statset{display:flex;gap:34px;flex-wrap:wrap;margin-top:22px;padding-bottom:26px}
+.stat .k{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);
+  font-weight:600;margin-bottom:3px}
+.stat .v{font-size:25px;letter-spacing:-.02em}
+.stat .n{font-size:12.5px;color:var(--ink-3)}
+
+/* ---------- section ---------- */
+section{padding:44px 0;border-bottom:1px solid var(--rule)}
+.shead{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+.shead h2{font-size:30px}
+.shead .note{font-size:13px;color:var(--ink-3);max-width:52ch}
+.deck{color:var(--ink-2);max-width:66ch;font-size:15.5px;margin:10px 0 26px}
+
+/* ---------- quadrant ---------- */
+.plotcard{background:var(--card);border:1px solid var(--rule);border-radius:3px;
+  box-shadow:var(--shadow);padding:18px 18px 12px;position:relative}
+#plot{display:block;width:100%;height:auto}
+.axkey{display:flex;justify-content:space-between;gap:16px;margin-top:10px;
+  font-size:11.5px;color:var(--ink-3);flex-wrap:wrap}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);
+  margin-top:14px;align-items:center}
+.legend i{width:10px;height:10px;border-radius:50%;background:var(--amber);
+  display:inline-block;margin-right:6px;vertical-align:-1px}
+.legend .sq{width:22px;height:10px;border-radius:2px;background:var(--slate-soft);
+  border:1px solid var(--slate);display:inline-block;margin-right:6px;vertical-align:-1px}
+
+/* ---------- ledger table ---------- */
+.tablewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;
+  background:var(--card);box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:720px}
+th{text-align:right;padding:11px 12px;font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);font-weight:600;
+  border-bottom:1.5px solid var(--ink);white-space:nowrap;background:var(--card)}
+th:first-child{text-align:left}
+td{padding:0;border-bottom:1px solid var(--rule-2);vertical-align:middle}
+td .cell{padding:9px 12px;text-align:right;white-space:nowrap}
+td:first-child .cell{text-align:left}
+tbody tr:nth-child(even){background:color-mix(in srgb,var(--rule-2) 42%,transparent)}
+.bname{font-weight:500;display:flex;align-items:center;gap:7px}
+.rank{color:var(--ink-3);font-size:11px;width:18px;display:inline-block;text-align:right}
+/* the bar is the row, not a chart beside it */
+.pctcell{position:relative;min-width:132px}
+.pctbar{position:absolute;left:0;top:3px;bottom:3px;background:var(--amber-soft);
+  border-right:2px solid var(--amber);border-radius:1px}
+.pctcell .cell{position:relative;z-index:1}
+.over .pctbar{background:color-mix(in srgb,var(--crit) 20%,transparent);
+  border-right-color:var(--crit)}
+.over .pctv{color:var(--crit);font-weight:600}
+.np{color:var(--ink-3);font-style:italic;font-size:12px}
+.age-hot{color:var(--crit);font-weight:600}
+
+/* ---------- notes ---------- */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:26px}
+.callout{border-left:2.5px solid var(--amber);padding:2px 0 2px 16px}
+.callout h3{font-size:19px;margin-bottom:6px}
+.callout p{margin:0;font-size:14.5px;color:var(--ink-2)}
+.dua{border:1px solid var(--amber);background:var(--amber-soft);border-radius:3px;
+  padding:16px 18px;font-size:13.5px;color:var(--ink-2)}
+.dua b{color:var(--amber-ink)}
+ul.tight{margin:8px 0 0;padding-left:18px;font-size:14.5px;color:var(--ink-2)}
+ul.tight li{margin-bottom:6px}
+footer{padding:30px 0 60px;font-size:12.5px;color:var(--ink-3)}
+footer a{color:var(--ink-2)}
+@media (max-width:640px){
+  .wrap{padding:0 18px}
+  .figure-row{gap:22px}
+  .statset{gap:22px}
+}
+@media (prefers-reduced-motion:no-preference){
+  .reveal{opacity:0;transform:translateY(8px);animation:rise .55s ease forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+}
+</style>
+
 </head>
 <body>
-<div id="wrap">
-  <div id="side">
-    <header>
-      <h1>London Land Ledger</h1>
-      <div class="sub">Land with planning permission that hasn't been started — against each borough's ten-year target.</div>
-    </header>
+<div class="wrap">
 
-    <div class="headline">
-      <div class="big" id="hl">—</div>
-      <div class="sub" id="hlsub">&nbsp;</div>
+<header class="mast">
+  <div class="row">
+    <div>
+      <div class="eyebrow">London Land Ledger · Brief DB</div>
+      <h1>The land already said&nbsp;yes&nbsp;to</h1>
     </div>
-
-    <div class="controls">
-      <label>Show sites</label>
-      <button class="f on" data-k="pns">Permitted, not started</button>
-      <button class="f" data-k="unperm">Identified, no permission</button>
-      <button class="f" data-k="deliverable">Deliverable ≤5yrs</button>
-      <button class="f" data-k="public">Public-owned</button>
-      <button class="f" data-k="demand">Demand pressure</button>
-    </div>
-
-    <div id="tablewrap">
-      <table id="tbl">
-        <thead><tr>
-          <th data-s="borough">Borough</th>
-          <th data-s="sites_permitted_not_started">Sites</th>
-          <th data-s="hectares_permitted_not_started">Hectares</th>
-          <th data-s="homes_min_permitted_not_started">Homes</th>
-          <th data-s="pct_of_target_pns">% of target</th>
-          <th data-s="median_permission_age_years">Age</th>
-        </tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-
-    <div class="dua" id="duaNote" hidden>
-      <b>Demand layer — restricted.</b> Source: WhereToBuild project, CAGE, University of Warwick.
-      Data provided by Dr Amrita Kulka and Dr Nikhil Datta. Research measures — not official
-      estimates of housing need or planning targets. Not for publication without approval.
-    </div>
-
-    <footer>
-      Brownfield registers + London Plan 2021 Table 4.1 · live sites only ·
-      <button id="btnCsv">Download CSV</button>
-    </footer>
+    <div class="eyebrow mono">33 boroughs · 5,185 live sites</div>
   </div>
-  <div id="map"></div>
+  <p class="sub">Brownfield land across London that already holds planning permission and
+  has not been started — measured against each borough's ten-year housing target.</p>
+
+  <nav class="viewnav" role="tablist" aria-label="Views">
+    <button role="tab" id="tab-ledger" aria-controls="view-ledger" aria-selected="true">The finding</button>
+    <button role="tab" id="tab-map" aria-controls="view-map" aria-selected="false">Explore the map</button>
+  </nav>
+</header>
+
+<div id="view-ledger" role="tabpanel" aria-labelledby="tab-ledger">
+<div class="thesis">
+  <div class="figure-row">
+    <div>
+      <div class="bignum mono">2,554<span class="u"> ha</span></div>
+      <div class="eyebrow" style="margin-top:8px">Permitted · not started</div>
+    </div>
+    <p class="lede">That is roughly <b>171,800 homes</b> — <b>35% of the 33 boroughs'
+    combined ten-year target</b> — sitting on land councils have already assessed,
+    published, and granted permission on.<br><br>
+    In three boroughs it exceeds their <em>entire</em> ten-year target.</p>
+  </div>
+  <div class="statset">
+    <div class="stat"><div class="k">Sites</div><div class="v mono">3,095</div>
+      <div class="n">permitted, unstarted</div></div>
+    <div class="stat"><div class="k">Combined target</div><div class="v mono">487,660</div>
+      <div class="n">London Plan 2021, T4.1</div></div>
+    <div class="stat"><div class="k">Boroughs over 100%</div><div class="v mono">3</div>
+      <div class="n">of 24 that can be ranked</div></div>
+    <div class="stat"><div class="k">Capacity not published</div><div class="v mono">9</div>
+      <div class="n">of 33 boroughs</div></div>
+  </div>
 </div>
 
-<div class="legend" id="legend">
-  <div><i style="background:#f0883e"></i>Permitted, not started</div>
-  <div><i style="background:#58a6ff"></i>No permission</div>
-  <div><i style="background:#a371f7"></i>Pending decision</div>
-  <div style="color:#8b98a5;margin-top:5px">Circle size = site area</div>
+<section>
+  <div class="shead">
+    <h2>Where demand meets stalled permission</h2>
+  </div>
+  <p class="deck">Each borough plotted by demand pressure against the share of its
+  ten-year target already permitted but unstarted. The upper-right is the argument:
+  places where people most want to live, that have already approved the homes.
+  Circle size is hectares; darker circles have waited longer.</p>
+
+  <div class="plotcard">
+    <canvas id="plot" width="1600" height="900" role="img"
+      aria-label="Scatter plot of London boroughs: demand pressure on the horizontal axis against permitted-but-unstarted capacity as a share of ten-year target on the vertical axis. Kensington and Chelsea sits furthest upper-right at 131 percent of target with the highest demand pressure and a 9.5 year median permission age."></canvas>
+    <div class="axkey">
+      <span>← lower demand pressure &nbsp;·&nbsp; horizontal: WhereToBuild gap per km² (research measure)</span>
+      <span>higher demand pressure →</span>
+    </div>
+    <div class="legend">
+      <span><i></i>Borough (size = hectares)</span>
+      <span><span class="sq"></span>Above 100% of ten-year target</span>
+      <span style="color:var(--ink-3)">Darker fill = longer median permission age</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="shead">
+    <h2>The ledger</h2>
+    <span class="note">Ranked by unstarted permitted capacity as a share of the
+    ten-year target. Bar is drawn to 131% full scale.</span>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th>Borough</th>
+        <th>Sites</th>
+        <th>Hectares</th>
+        <th>Homes</th>
+        <th>10-yr target</th>
+        <th style="text-align:left;padding-left:14px">% of target</th>
+        <th>Median wait</th>
+      </tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-3);margin-top:12px">
+    <b class="np">n/p</b> — no dwelling capacity published for this borough's
+    permitted-but-unstarted sites. Shown as not published, never as zero, and excluded
+    from the ranking. These nine still hold 782 live sites and 387 ha. Westminster and
+    Redbridge are different: their sites <em>do</em> state capacity, and it is
+    genuinely zero.</p>
+</section>
+
+<section>
+  <div class="shead"><h2>Three that exceed their whole target</h2></div>
+  <div class="grid2" style="margin-top:20px">
+    <div class="callout">
+      <h3>Kensington &amp; Chelsea — 131%</h3>
+      <p>The sharpest case in London. Highest demand pressure of any borough,
+      enough permitted-but-unstarted capacity to cover its entire ten-year target
+      with room to spare, and a median permission that has sat for
+      <b>nine and a half years</b>.</p>
+    </div>
+    <div class="callout">
+      <h3>Barking &amp; Dagenham — 120%</h3>
+      <p>436 hectares, the largest area of stalled permitted land in London —
+      23,251 homes against a 19,440 target. Demand pressure here is low by London
+      standards, which makes it a different argument: the land is ready, the
+      market is not pulling.</p>
+    </div>
+    <div class="callout">
+      <h3>Camden — 106%</h3>
+      <p>10,973 homes permitted and unstarted on just 40 hectares — the densest
+      stalled capacity in the city, in the fifth most pressured borough,
+      waiting a median 8.5 years.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="shead"><h2>What this is, and is not</h2></div>
+  <div class="grid2" style="margin-top:18px">
+    <div>
+      <ul class="tight">
+        <li><b>Not "all available land in London."</b> It is land each borough has
+        itself assessed as suitable for housing and published on its brownfield
+        register. Greenfield, green belt and unassessed land are absent.</li>
+        <li><b>Sites must be ≥0.25 ha or ≥5 dwellings</b> to appear at all. Small
+        infill is invisible here.</li>
+        <li><b>Capacity figures are the councils' own estimates</b>, not independent
+        assessments.</li>
+      </ul>
+    </div>
+    <div>
+      <ul class="tight">
+        <li><b>"Not started" is really "not recorded as started."</b> The register's
+        own <span class="mono">Started</span> flag appears on just 49 London sites,
+        so this leans on <span class="mono">end-date</span> as a completion proxy.
+        It is a proxy and we call it one.</li>
+        <li><b>Permission status needed cleaning.</b> The register specifies three
+        values; London rows contain twelve, including free text and typos. Every
+        remap is logged and auditable.</li>
+        <li><b>276 of 5,185 sites have no usable coordinates</b> — counted in every
+        total, absent from the map.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="dua" style="margin-top:26px">
+    <b>Demand layer — restricted.</b> Source: WhereToBuild project, CAGE, University
+    of Warwick. Data provided by Dr Amrita Kulka and Dr Nikhil Datta. These are
+    research measures and are <b>not</b> official estimates of housing need, housing
+    requirements or planning targets. Event use only — not for redistribution or
+    publication without approval from Dr Kulka and Dr Datta.
+  </div>
+</section>
+
 </div>
+
+<div id="view-map" role="tabpanel" aria-labelledby="tab-map" hidden>
+  <section style="border-bottom:0;padding-bottom:14px">
+    <div class="shead"><h2>Every site, mapped</h2></div>
+    <p class="deck">Each circle is one brownfield site, sized by area. Click a borough
+    to filter the table and zoom; click a site for its address, capacity and permission
+    history. Sites without published coordinates are counted in the table but cannot
+    be drawn.</p>
+
+    <div class="filters" id="filters">
+      <button class="f" data-k="pns" aria-pressed="true">Permitted, not started</button>
+      <button class="f" data-k="unperm" aria-pressed="false">Identified, no permission</button>
+      <button class="f" data-k="deliverable" aria-pressed="false">Deliverable &le;5 yrs</button>
+      <button class="f" data-k="public" aria-pressed="false">Public-owned</button>
+      <button class="f" data-k="demand" aria-pressed="false">Demand pressure</button>
+    </div>
+
+    <div class="mapgrid">
+      <div id="map"></div>
+      <div class="mappanel">
+        <div class="mapstat">
+          <div class="v mono" id="mapcount">&mdash;</div>
+          <div class="n" id="mapscope">loading sites&hellip;</div>
+        </div>
+        <div class="legend-map" id="maplegend">
+          <span><i style="background:var(--amber)"></i>Permitted, not started</span>
+          <span><i style="background:var(--slate)"></i>No permission</span>
+          <span><i style="background:#8B7BA8"></i>Pending decision</span>
+        </div>
+        <div class="mtablewrap">
+          <table id="mtbl">
+            <thead><tr>
+              <th data-s="borough">Borough</th>
+              <th data-s="hectares_permitted_not_started">Ha</th>
+              <th data-s="homes_min_permitted_not_started">Homes</th>
+              <th data-s="pct_of_target_pns">% tgt</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="maphint">Click a row or a borough to filter. Click again to clear.</p>
+        <div class="dua" id="duaNote" hidden>
+          <b>Demand layer &mdash; restricted.</b> Source: WhereToBuild project, CAGE,
+          University of Warwick. Data provided by Dr Amrita Kulka and Dr Nikhil Datta.
+          Research measures &mdash; not official estimates of housing need or planning
+          targets. Not for publication without approval.
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer>
+  Supply: brownfield land registers via planning.data.gov.uk, Open Government Licence v3.0 ·
+  Targets: London Plan 2021 Table 4.1, net housing completions 2019/20–2028/29 ·
+  Boundaries: planning.data.gov.uk · MSOA→borough lookup: ONS Open Geography Portal.<br>
+  Live sites only (<span class="mono">end-date</span> empty). Development Corporations
+  (LLDC, OPDC) excluded to avoid double-counting inside borough geography.
+</footer>
+</div>
+
+<script>const DATA=[{"borough":"Kensington and Chelsea","sites_permitted_not_started":47,"hectares_permitted_not_started":34.21,"homes_min_permitted_not_started":5867.0,"homes_max_permitted_not_started":6298.0,"ten_year_target":4480,"pct_of_target_pns":130.96,"median_permission_age_years":9.46,"demand_gap_per_km2":2250.15,"homes_capacity_reported":true,"sites_total":74,"hectares_total":72.97,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":7983.0,"pct_hectares_public":7.24},{"borough":"Barking and Dagenham","sites_permitted_not_started":35,"hectares_permitted_not_started":436.16,"homes_min_permitted_not_started":23251.0,"homes_max_permitted_not_started":33211.0,"ten_year_target":19440,"pct_of_target_pns":119.6,"median_permission_age_years":6.05,"demand_gap_per_km2":173.33,"homes_capacity_reported":true,"sites_total":86,"hectares_total":614.69,"data_quality_flag":null,"pct_sites_with_homes":68.6,"homes_min_unpermissioned":14168.0,"pct_hectares_public":7.79},{"borough":"Camden","sites_permitted_not_started":138,"hectares_permitted_not_started":39.59,"homes_min_permitted_not_started":10973.0,"homes_max_permitted_not_started":10972.0,"ten_year_target":10380,"pct_of_target_pns":105.71,"median_permission_age_years":8.53,"demand_gap_per_km2":1490.17,"homes_capacity_reported":true,"sites_total":151,"hectares_total":61.25,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":1825.0,"pct_hectares_public":18.24},{"borough":"Lewisham","sites_permitted_not_started":171,"hectares_permitted_not_started":89.68,"homes_min_permitted_not_started":16309.0,"homes_max_permitted_not_started":16388.0,"ten_year_target":16670,"pct_of_target_pns":97.83,"median_permission_age_years":5.12,"demand_gap_per_km2":498.83,"homes_capacity_reported":true,"sites_total":240,"hectares_total":143.3,"data_quality_flag":null,"pct_sites_with_homes":98.75,"homes_min_unpermissioned":7092.0,"pct_hectares_public":5.89},{"borough":"Wandsworth","sites_permitted_not_started":123,"hectares_permitted_not_started":191.65,"homes_min_permitted_not_started":18845.0,"homes_max_permitted_not_started":19639.0,"ten_year_target":19500,"pct_of_target_pns":96.64,"median_permission_age_years":3.93,"demand_gap_per_km2":1070.17,"homes_capacity_reported":true,"sites_total":189,"hectares_total":252.54,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":9456.0,"pct_hectares_public":14.11},{"borough":"Barnet","sites_permitted_not_started":225,"hectares_permitted_not_started":518.66,"homes_min_permitted_not_started":18058.0,"homes_max_permitted_not_started":18058.0,"ten_year_target":23640,"pct_of_target_pns":76.39,"median_permission_age_years":9.37,"demand_gap_per_km2":285.34,"homes_capacity_reported":true,"sites_total":240,"hectares_total":553.56,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":43.33,"homes_min_unpermissioned":null,"pct_hectares_public":2.98},{"borough":"Greenwich","sites_permitted_not_started":83,"hectares_permitted_not_started":118.47,"homes_min_permitted_not_started":18410.0,"homes_max_permitted_not_started":18410.0,"ten_year_target":28240,"pct_of_target_pns":65.19,"median_permission_age_years":9.23,"demand_gap_per_km2":419.73,"homes_capacity_reported":true,"sites_total":94,"hectares_total":129.38,"data_quality_flag":null,"pct_sites_with_homes":97.87,"homes_min_unpermissioned":1231.0,"pct_hectares_public":5.42},{"borough":"Waltham Forest","sites_permitted_not_started":48,"hectares_permitted_not_started":37.42,"homes_min_permitted_not_started":7531.0,"homes_max_permitted_not_started":7531.0,"ten_year_target":12640,"pct_of_target_pns":59.58,"median_permission_age_years":8.92,"demand_gap_per_km2":493.31,"homes_capacity_reported":true,"sites_total":183,"hectares_total":126.76,"data_quality_flag":null,"pct_sites_with_homes":85.25,"homes_min_unpermissioned":7597.0,"pct_hectares_public":42.14},{"borough":"Hounslow","sites_permitted_not_started":133,"hectares_permitted_not_started":61.5,"homes_min_permitted_not_started":10108.0,"homes_max_permitted_not_started":10118.0,"ten_year_target":17820,"pct_of_target_pns":56.72,"median_permission_age_years":6.09,"demand_gap_per_km2":285.58,"homes_capacity_reported":true,"sites_total":173,"hectares_total":64.43,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":230.0,"pct_hectares_public":46.7},{"borough":"Brent","sites_permitted_not_started":114,"hectares_permitted_not_started":61.11,"homes_min_permitted_not_started":11621.0,"homes_max_permitted_not_started":11636.0,"ten_year_target":23250,"pct_of_target_pns":49.98,"median_permission_age_years":6.92,"demand_gap_per_km2":320.31,"homes_capacity_reported":true,"sites_total":213,"hectares_total":218.21,"data_quality_flag":null,"pct_sites_with_homes":86.38,"homes_min_unpermissioned":13410.0,"pct_hectares_public":6.92},{"borough":"Richmond upon Thames","sites_permitted_not_started":35,"hectares_permitted_not_started":12.46,"homes_min_permitted_not_started":1848.0,"homes_max_permitted_not_started":1848.0,"ten_year_target":4110,"pct_of_target_pns":44.96,"median_permission_age_years":2.88,"demand_gap_per_km2":590.0,"homes_capacity_reported":true,"sites_total":57,"hectares_total":30.29,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":509.0,"pct_hectares_public":4.91},{"borough":"Croydon","sites_permitted_not_started":343,"hectares_permitted_not_started":54.6,"homes_min_permitted_not_started":8342.0,"homes_max_permitted_not_started":8342.0,"ten_year_target":20790,"pct_of_target_pns":40.13,"median_permission_age_years":8.21,"demand_gap_per_km2":200.98,"homes_capacity_reported":true,"sites_total":495,"hectares_total":172.8,"data_quality_flag":null,"pct_sites_with_homes":99.8,"homes_min_unpermissioned":9890.0,"pct_hectares_public":17.55},{"borough":"Bexley","sites_permitted_not_started":72,"hectares_permitted_not_started":37.84,"homes_min_permitted_not_started":2506.0,"homes_max_permitted_not_started":2790.0,"ten_year_target":6850,"pct_of_target_pns":36.58,"median_permission_age_years":6.09,"demand_gap_per_km2":221.18,"homes_capacity_reported":true,"sites_total":108,"hectares_total":83.77,"data_quality_flag":null,"pct_sites_with_homes":79.63,"homes_min_unpermissioned":4595.0,"pct_hectares_public":7.65},{"borough":"Merton","sites_permitted_not_started":220,"hectares_permitted_not_started":73.66,"homes_min_permitted_not_started":2987.0,"homes_max_permitted_not_started":2987.0,"ten_year_target":9180,"pct_of_target_pns":32.54,"median_permission_age_years":7.16,"demand_gap_per_km2":445.74,"homes_capacity_reported":true,"sites_total":277,"hectares_total":115.28,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":41.52,"homes_min_unpermissioned":3154.0,"pct_hectares_public":3.53},{"borough":"Islington","sites_permitted_not_started":38,"hectares_permitted_not_started":36.12,"homes_min_permitted_not_started":2431.0,"homes_max_permitted_not_started":2431.0,"ten_year_target":7750,"pct_of_target_pns":31.37,"median_permission_age_years":9.07,"demand_gap_per_km2":1530.59,"homes_capacity_reported":true,"sites_total":77,"hectares_total":82.09,"data_quality_flag":null,"pct_sites_with_homes":93.51,"homes_min_unpermissioned":5564.0,"pct_hectares_public":63.86},{"borough":"Haringey","sites_permitted_not_started":213,"hectares_permitted_not_started":69.4,"homes_min_permitted_not_started":3314.0,"homes_max_permitted_not_started":3444.0,"ten_year_target":15920,"pct_of_target_pns":20.82,"median_permission_age_years":9.63,"demand_gap_per_km2":514.68,"homes_capacity_reported":true,"sites_total":277,"hectares_total":182.36,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":56.32,"homes_min_unpermissioned":null,"pct_hectares_public":10.29},{"borough":"Hackney","sites_permitted_not_started":33,"hectares_permitted_not_started":4.62,"homes_min_permitted_not_started":2736.0,"homes_max_permitted_not_started":2736.0,"ten_year_target":13280,"pct_of_target_pns":20.6,"median_permission_age_years":9.4,"demand_gap_per_km2":1140.11,"homes_capacity_reported":true,"sites_total":38,"hectares_total":6.91,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":18.42,"homes_min_unpermissioned":476.0,"pct_hectares_public":0.0},{"borough":"Lambeth","sites_permitted_not_started":49,"hectares_permitted_not_started":14.1,"homes_min_permitted_not_started":2417.0,"homes_max_permitted_not_started":2417.0,"ten_year_target":13350,"pct_of_target_pns":18.1,"median_permission_age_years":2.61,"demand_gap_per_km2":917.25,"homes_capacity_reported":true,"sites_total":51,"hectares_total":15.62,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":570.0,"pct_hectares_public":28.55},{"borough":"Hammersmith & Fulham","sites_permitted_not_started":17,"hectares_permitted_not_started":11.12,"homes_min_permitted_not_started":2494.0,"homes_max_permitted_not_started":2494.0,"ten_year_target":16090,"pct_of_target_pns":15.5,"median_permission_age_years":8.57,"demand_gap_per_km2":1354.18,"homes_capacity_reported":true,"sites_total":23,"hectares_total":24.32,"data_quality_flag":null,"pct_sites_with_homes":95.65,"homes_min_unpermissioned":null,"pct_hectares_public":2.55},{"borough":"City of London","sites_permitted_not_started":2,"hectares_permitted_not_started":0.22,"homes_min_permitted_not_started":104.0,"homes_max_permitted_not_started":104.0,"ten_year_target":1460,"pct_of_target_pns":7.12,"median_permission_age_years":10.04,"demand_gap_per_km2":1890.94,"homes_capacity_reported":true,"sites_total":2,"hectares_total":0.22,"data_quality_flag":"LOW_SITE_COUNT;","pct_sites_with_homes":100.0,"homes_min_unpermissioned":null,"pct_hectares_public":0.0},{"borough":"Southwark","sites_permitted_not_started":416,"hectares_permitted_not_started":182.41,"homes_min_permitted_not_started":778.0,"homes_max_permitted_not_started":950.0,"ten_year_target":23550,"pct_of_target_pns":3.3,"median_permission_age_years":9.93,"demand_gap_per_km2":856.7,"homes_capacity_reported":true,"sites_total":791,"hectares_total":383.98,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":43.99,"homes_min_unpermissioned":7615.0,"pct_hectares_public":0.0},{"borough":"Newham","sites_permitted_not_started":75,"hectares_permitted_not_started":7.02,"homes_min_permitted_not_started":885.0,"homes_max_permitted_not_started":1368.0,"ten_year_target":32800,"pct_of_target_pns":2.7,"median_permission_age_years":7.33,"demand_gap_per_km2":397.81,"homes_capacity_reported":true,"sites_total":96,"hectares_total":11.54,"data_quality_flag":null,"pct_sites_with_homes":98.96,"homes_min_unpermissioned":612.0,"pct_hectares_public":36.66},{"borough":"Redbridge","sites_permitted_not_started":72,"hectares_permitted_not_started":22.07,"homes_min_permitted_not_started":0.0,"homes_max_permitted_not_started":0.0,"ten_year_target":14090,"pct_of_target_pns":0.0,"median_permission_age_years":10.61,"demand_gap_per_km2":315.48,"homes_capacity_reported":true,"sites_total":188,"hectares_total":128.11,"data_quality_flag":null,"pct_sites_with_homes":76.6,"homes_min_unpermissioned":0.0,"pct_hectares_public":56.58},{"borough":"Westminster","sites_permitted_not_started":208,"hectares_permitted_not_started":52.95,"homes_min_permitted_not_started":0.0,"homes_max_permitted_not_started":0.0,"ten_year_target":9850,"pct_of_target_pns":0.0,"median_permission_age_years":9.45,"demand_gap_per_km2":1795.2,"homes_capacity_reported":true,"sites_total":280,"hectares_total":99.09,"data_quality_flag":null,"pct_sites_with_homes":100.0,"homes_min_unpermissioned":0.0,"pct_hectares_public":9.21},{"borough":"Bromley","sites_permitted_not_started":76,"hectares_permitted_not_started":29.82,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":7740,"pct_of_target_pns":null,"median_permission_age_years":9.25,"demand_gap_per_km2":228.11,"homes_capacity_reported":false,"sites_total":88,"hectares_total":52.16,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":23.69},{"borough":"Ealing","sites_permitted_not_started":31,"hectares_permitted_not_started":61.22,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":21570,"pct_of_target_pns":null,"median_permission_age_years":9.07,"demand_gap_per_km2":382.95,"homes_capacity_reported":false,"sites_total":70,"hectares_total":111.69,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":10.62},{"borough":"Enfield","sites_permitted_not_started":27,"hectares_permitted_not_started":49.82,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":12460,"pct_of_target_pns":null,"median_permission_age_years":9.55,"demand_gap_per_km2":201.03,"homes_capacity_reported":false,"sites_total":27,"hectares_total":49.82,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":18.22},{"borough":"Harrow","sites_permitted_not_started":84,"hectares_permitted_not_started":80.2,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":8020,"pct_of_target_pns":null,"median_permission_age_years":10.62,"demand_gap_per_km2":185.66,"homes_capacity_reported":false,"sites_total":102,"hectares_total":102.48,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":45.61},{"borough":"Havering","sites_permitted_not_started":63,"hectares_permitted_not_started":38.49,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":12850,"pct_of_target_pns":null,"median_permission_age_years":null,"demand_gap_per_km2":219.6,"homes_capacity_reported":false,"sites_total":114,"hectares_total":104.1,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":26.16},{"borough":"Hillingdon","sites_permitted_not_started":52,"hectares_permitted_not_started":73.35,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":10830,"pct_of_target_pns":null,"median_permission_age_years":9.98,"demand_gap_per_km2":129.22,"homes_capacity_reported":false,"sites_total":203,"hectares_total":180.21,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":0.47},{"borough":"Kingston upon Thames","sites_permitted_not_started":23,"hectares_permitted_not_started":24.89,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":9640,"pct_of_target_pns":null,"median_permission_age_years":5.5,"demand_gap_per_km2":389.74,"homes_capacity_reported":false,"sites_total":49,"hectares_total":64.14,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":0.0},{"borough":"Sutton","sites_permitted_not_started":48,"hectares_permitted_not_started":24.66,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":4690,"pct_of_target_pns":null,"median_permission_age_years":10.75,"demand_gap_per_km2":250.85,"homes_capacity_reported":true,"sites_total":103,"hectares_total":47.99,"data_quality_flag":"PARTIAL_CAPACITY;","pct_sites_with_homes":53.4,"homes_min_unpermissioned":2850.0,"pct_hectares_public":38.34},{"borough":"Tower Hamlets","sites_permitted_not_started":7,"hectares_permitted_not_started":4.92,"homes_min_permitted_not_started":null,"homes_max_permitted_not_started":null,"ten_year_target":34730,"pct_of_target_pns":null,"median_permission_age_years":10.33,"demand_gap_per_km2":1184.97,"homes_capacity_reported":false,"sites_total":26,"hectares_total":95.99,"data_quality_flag":"NO_CAPACITY_PUBLISHED;","pct_sites_with_homes":0.0,"homes_min_unpermissioned":null,"pct_hectares_public":0.0}];</script>
+<script>
+const fmt=(n,d=0)=>n==null?"–":Number(n).toLocaleString("en-GB",
+  {minimumFractionDigits:d,maximumFractionDigits:d});
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+/* ---------------- ledger ---------------- */
+const rows=[...DATA].sort((a,b)=>{
+  const x=a.pct_of_target_pns, y=b.pct_of_target_pns;
+  if(x==null&&y==null) return b.hectares_permitted_not_started-a.hectares_permitted_not_started;
+  if(x==null) return 1; if(y==null) return -1; return y-x;
+});
+const SCALE=131;
+let rank=0;
+document.getElementById("tb").innerHTML=rows.map((r,i)=>{
+  const pct=r.pct_of_target_pns;
+  // "not published" is a property of this segment, not just the borough:
+  // Sutton reports capacity elsewhere but not on its permitted-unstarted sites.
+  const np=r.homes_min_permitted_not_started==null;
+  const w=pct==null?0:Math.min(100,(pct/SCALE)*100);
+  const hot=r.median_permission_age_years>=8.5;
+  return `<tr class="${pct>=100?"over":""}">
+    <td><div class="cell"><span class="bname"><span class="rank mono">${pct==null?"–":++rank}</span>${r.borough}</span></div></td>
+    <td><div class="cell mono">${fmt(r.sites_permitted_not_started)}</div></td>
+    <td><div class="cell mono">${fmt(r.hectares_permitted_not_started,1)}</div></td>
+    <td><div class="cell mono">${np?'<span class="np">n/p</span>':fmt(r.homes_min_permitted_not_started)}</div></td>
+    <td><div class="cell mono" style="color:var(--ink-3)">${fmt(r.ten_year_target)}</div></td>
+    <td class="pctcell">${pct==null?"":`<div class="pctbar" style="width:${w}%"></div>`}
+      <div class="cell mono" style="text-align:left;padding-left:14px">
+      ${pct==null?'<span class="np">—</span>':`<span class="pctv">${fmt(pct)}%</span>`}</div></td>
+    <td><div class="cell mono ${hot?"age-hot":""}">${r.median_permission_age_years==null?"–":fmt(r.median_permission_age_years,1)+" yrs"}</div></td>
+  </tr>`;
+}).join("");
+
+/* ---------------- quadrant ---------------- */
+const cv=document.getElementById("plot"), ctx=cv.getContext("2d");
+const pts=DATA.filter(r=>r.homes_capacity_reported&&r.demand_gap_per_km2!=null);
+
+function draw(){
+  const W=cv.width,H=cv.height,dpr=1;
+  const L=92,R=52,T=44,B=86;
+  const iw=W-L-R, ih=H-T-B;
+  ctx.clearRect(0,0,W,H);
+
+  const xs=pts.map(p=>p.demand_gap_per_km2), ys=pts.map(p=>p.pct_of_target_pns);
+  const xMax=2450, yMax=152;
+  const X=v=>L+(v/xMax)*iw, Y=v=>T+ih-(v/yMax)*ih;
+
+  const rule=css("--rule"), ink3=css("--ink-3"), ink=css("--ink"),
+        amber=css("--amber"), slateSoft=css("--slate-soft"), slate=css("--slate"),
+        crit=css("--crit"), card=css("--card");
+
+  // upper-right emphasis band: above 100% of target
+  ctx.fillStyle=slateSoft; ctx.globalAlpha=.55;
+  ctx.fillRect(L,Y(yMax),iw,Y(100)-Y(yMax));
+  ctx.globalAlpha=1;
+
+  // grid
+  ctx.strokeStyle=rule; ctx.lineWidth=1; ctx.setLineDash([3,5]);
+  for(let v=25;v<=125;v+=25){ctx.beginPath();ctx.moveTo(L,Y(v));ctx.lineTo(L+iw,Y(v));ctx.stroke();}
+  for(let v=500;v<=2000;v+=500){ctx.beginPath();ctx.moveTo(X(v),T);ctx.lineTo(X(v),T+ih);ctx.stroke();}
+  ctx.setLineDash([]);
+
+  // 100% line — the threshold that matters
+  ctx.strokeStyle=crit; ctx.lineWidth=1.5; ctx.setLineDash([7,4]);
+  ctx.beginPath();ctx.moveTo(L,Y(100));ctx.lineTo(L+iw,Y(100));ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle=crit; ctx.font="600 20px 'IBM Plex Mono',monospace";
+  ctx.textAlign="left"; ctx.fillText("100% of ten-year target",L+10,Y(100)-12);
+
+  // axes
+  ctx.strokeStyle=ink; ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(L,T);ctx.lineTo(L,T+ih);ctx.lineTo(L+iw,T+ih);ctx.stroke();
+
+  ctx.fillStyle=ink3; ctx.font="500 19px 'IBM Plex Mono',monospace";
+  ctx.textAlign="right";
+  for(let v=0;v<=125;v+=25){ctx.fillText(v+"%",L-14,Y(v)+7);}
+  ctx.textAlign="center";
+  for(let v=0;v<=2000;v+=500){ctx.fillText(v.toLocaleString("en-GB"),X(v),T+ih+34);}
+
+  ctx.font="600 17px 'IBM Plex Sans',sans-serif"; ctx.fillStyle=ink3;
+  ctx.save();ctx.translate(26,T+ih/2);ctx.rotate(-Math.PI/2);ctx.textAlign="center";
+  ctx.fillText("PERMITTED, UNSTARTED — % OF TEN-YEAR TARGET",0,0);ctx.restore();
+  ctx.textAlign="center";
+  ctx.fillText("DEMAND PRESSURE — GAP PER KM² (RESEARCH MEASURE)",L+iw/2,T+ih+72);
+
+  // age -> fill darkness
+  const ages=pts.map(p=>p.median_permission_age_years||0);
+  const aMin=Math.min(...ages), aMax=Math.max(...ages);
+
+  const sorted=[...pts].sort((a,b)=>b.hectares_permitted_not_started-a.hectares_permitted_not_started);
+  for(const p of sorted){
+    const x=X(Math.min(p.demand_gap_per_km2,xMax)), y=Y(Math.min(p.pct_of_target_pns,yMax));
+    const r=Math.max(9,Math.min(46,Math.sqrt(p.hectares_permitted_not_started)*2.6));
+    const t=(p.median_permission_age_years-aMin)/(aMax-aMin||1);
+    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fillStyle=amber; ctx.globalAlpha=.16+t*.5; ctx.fill();
+    ctx.globalAlpha=1; ctx.strokeStyle=amber; ctx.lineWidth=2; ctx.stroke();
+  }
+
+  // labels: the ones that carry the argument
+  const NAMED={"Kensington and Chelsea":[0,-62],"Barking and Dagenham":[0,-74],
+    "Camden":[0,-42],"Lewisham":[0,-40],"Wandsworth":[58,22],"Barnet":[0,-60],
+    "Westminster":[0,-32],"Sutton":[0,-30],"Greenwich":[0,-42]};
+  ctx.font="600 21px 'IBM Plex Sans',sans-serif"; ctx.textAlign="center";
+  for(const p of pts){
+    const off=NAMED[p.borough]; if(!off) continue;
+    const label=p.borough==="Kensington and Chelsea"?"Kensington & Chelsea":
+                p.borough==="Barking and Dagenham"?"Barking & Dagenham":p.borough;
+    const w=ctx.measureText(label).width;
+    // keep the label box inside the plot frame — points at the axis extremes
+    // would otherwise run off the card.
+    const cx=Math.min(Math.max(X(Math.min(p.demand_gap_per_km2,xMax))+off[0],
+                               L+w/2+8), L+iw-w/2-8);
+    const y=Y(Math.min(p.pct_of_target_pns,yMax))+off[1];
+    ctx.fillStyle=card; ctx.globalAlpha=.82;
+    ctx.fillRect(cx-w/2-6,y-17,w+12,24);
+    ctx.globalAlpha=1;
+    ctx.fillStyle=p.pct_of_target_pns>=100?crit:ink;
+    ctx.fillText(label,cx,y);
+  }
+}
+draw();
+const mq=matchMedia("(prefers-color-scheme:dark)");
+mq.addEventListener?.("change",draw);
+new MutationObserver(draw).observe(document.documentElement,
+  {attributes:true,attributeFilter:["data-theme"]});
+</script>
+
 
 <script src="vendor/leaflet.js"></script>
 <script>
-const F = {pns:true, unperm:false, deliverable:false, public:false, demand:false};
-let SITES=[], SC=[], BOR=null, sel=null, sortKey="pct_of_target_pns", sortAsc=false;
-const fmt=(n,d=0)=>n==null||isNaN(n)?"–":Number(n).toLocaleString("en-GB",
-  {minimumFractionDigits:d,maximumFractionDigits:d});
-
-const map=L.map("map",{preferCanvas:true,zoomControl:true}).setView([51.505,-0.09],10.6);
-// Basemap is a network tile layer; if wifi is down the data layers still render.
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-  {maxZoom:19,attribution:"© OpenStreetMap © CARTO",crossOrigin:true}).addTo(map);
-
-const boundaryLayer=L.layerGroup().addTo(map);
-const siteLayer=L.layerGroup().addTo(map);
-
-const COL={permissioned:"#f0883e","not-permissioned":"#58a6ff",
-  "pending-decision":"#a371f7",unknown:"#484f58"};
-
-function siteVisible(s){
-  if(F.deliverable && !s.dlv) return false;
-  if(F.public && !s.pub) return false;
-  if(F.pns && F.unperm) return s.pns || s.st==="not-permissioned";
-  if(F.pns) return s.pns;
-  if(F.unperm) return s.st==="not-permissioned";
-  return true;
-}
-
-function drawSites(){
-  siteLayer.clearLayers();
-  const bounds = sel ? SC.find(r=>r.borough===sel) : null;
-  let n=0;
-  for(const s of SITES){
-    if(!siteVisible(s)) continue;
-    if(sel && s.b!==sel) continue;
-    n++;
-    const ha = s.ha||0.05;
-    const r = Math.max(3, Math.min(16, Math.sqrt(ha)*3.4));
-    L.circleMarker([s.y,s.x],{radius:r,
-      color:s.pns?COL.permissioned:COL[s.st]||COL.unknown,
-      weight:1,opacity:.9,fillOpacity:.45})
-     .bindPopup(popup(s)).addTo(siteLayer);
+/* ---------------- view switching ---------------- */
+const VIEWS={ledger:["tab-ledger","view-ledger"],map:["tab-map","view-map"]};
+let mapReady=false;
+function show(v){
+  for(const [name,[tab,panel]] of Object.entries(VIEWS)){
+    const on = name===v;
+    document.getElementById(tab).setAttribute("aria-selected",on);
+    document.getElementById(panel).hidden=!on;
   }
-  document.getElementById("hlsub").textContent =
-    `${fmt(n)} sites shown${sel?" · "+sel:""} · click a borough to filter`;
+  if(v==="map"){
+    if(!mapReady){ mapReady=true; initMap(); }
+    // Leaflet mis-sizes when initialised inside a hidden element.
+    else if(window.__map) setTimeout(()=>window.__map.invalidateSize(),0);
+    if(window.__map) setTimeout(()=>window.__map.invalidateSize(),0);
+  }
+  history.replaceState(null,"",v==="map"?"#map":"#finding");
 }
+document.getElementById("tab-ledger").onclick=()=>show("ledger");
+document.getElementById("tab-map").onclick=()=>show("map");
 
-function popup(s){
-  const homes = s.dmin==null ? "<i>not published</i>"
-    : (s.dmin===s.dmax ? fmt(s.dmin) : fmt(s.dmin)+"–"+fmt(s.dmax));
-  return `<div class="pop"><b>${s.ad||"(no address given)"}</b><hr>
-    <span class="k">Borough</span> ${s.b}<br>
-    <span class="k">Area</span> ${s.ha!=null?fmt(s.ha,2)+" ha":"–"}<br>
-    <span class="k">Homes (council estimate)</span> ${homes}<br>
-    <span class="k">Status</span> ${s.pns?"<b>Permitted, not started</b>":s.st}<br>
-    <span class="k">Permission date</span> ${s.pd||"–"}
-    ${s.u?`<hr><a href="${s.u}" target="_blank" rel="noopener">Site plan ↗</a>`:""}</div>`;
-}
+/* ---------------- map ---------------- */
+const F={pns:true,unperm:false,deliverable:false,public:false,demand:false};
+let SITES=[],BOR=null,sel=null,msort="pct_of_target_pns",masc=false;
+const CSSV=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
-function demandColor(v,max){
-  if(v==null) return "#30363d";
-  const t=Math.min(1,v/max);
-  return `rgba(240,136,62,${0.10+t*0.72})`;
-}
+function initMap(){
+  // SVG renderer: ~3k circles is well within its comfort zone, it survives
+  // theme re-renders, and unlike canvas it stays inspectable and printable.
+  const map=L.map("map",{renderer:L.svg()}).setView([51.505,-0.09],10);
+  window.__map=map;
+  // Basemap follows the page theme, so the map never fights its surroundings.
+  const isDark=()=>document.documentElement.dataset.theme
+    ? document.documentElement.dataset.theme==="dark"
+    : matchMedia("(prefers-color-scheme:dark)").matches;
+  const tileUrl=d=>`https://{s}.basemaps.cartocdn.com/${d?"dark_all":"light_all"}/{z}/{x}/{y}{r}.png`;
+  let tiles=L.tileLayer(tileUrl(isDark()),
+    {maxZoom:19,attribution:"&copy; OpenStreetMap &copy; CARTO",crossOrigin:true}).addTo(map);
+  const retheme=()=>{
+    tiles.setUrl(tileUrl(isDark()));
+    if(BOR) drawBoundaries();
+    if(SITES.length) drawSites();
+  };
+  matchMedia("(prefers-color-scheme:dark)").addEventListener?.("change",retheme);
+  new MutationObserver(retheme).observe(document.documentElement,
+    {attributes:true,attributeFilter:["data-theme"]});
+  const boundaryLayer=L.layerGroup().addTo(map);
+  const siteLayer=L.layerGroup().addTo(map);
 
-function drawBoundaries(){
-  boundaryLayer.clearLayers();
-  const maxD=Math.max(...SC.map(r=>r.demand_gap_per_km2||0));
-  L.geoJSON(BOR,{
-    style:f=>{
-      const p=f.properties;
-      return {color:sel===p.borough?"#f0883e":"#6e7a89",
-        weight:sel===p.borough?2.4:1.1,opacity:sel===p.borough?1:.75,
-        fillColor:F.demand?demandColor(p.demand_gap_per_km2,maxD):"#8b98a5",
-        fillOpacity:F.demand?1:(sel===p.borough?.14:.05)};
-    },
-    onEachFeature:(f,l)=>{
-      const p=f.properties;
-      l.on("click",()=>{select(sel===p.borough?null:p.borough)});
-      l.bindTooltip(`<b>${p.borough}</b><br>${fmt(p.hectares_permitted_not_started,1)} ha permitted, not started`
-        +(p.homes_capacity_reported?`<br>${fmt(p.homes_min_permitted_not_started)} homes · ${fmt(p.pct_of_target_pns)}% of target`
-          :`<br><i>no capacity published</i>`),{sticky:true});
-    }}).addTo(boundaryLayer);
-}
+  const statusColor=s=>s.pns?CSSV("--amber")
+    :s.st==="not-permissioned"?CSSV("--slate")
+    :s.st==="pending-decision"?"#8B7BA8":CSSV("--ink-3");
 
-function select(b){
-  sel=b; drawBoundaries(); drawSites(); renderTable();
-  if(b){const r=SC.find(x=>x.borough===b);
-    const f=BOR.features.find(f=>f.properties.borough===b);
-    if(f){map.fitBounds(L.geoJSON(f).getBounds(),{padding:[40,40]})}}
-  else map.setView([51.505,-0.09],10);
-}
-
-function renderTable(){
-  const tb=document.querySelector("#tbl tbody");
-  const rows=[...SC].sort((a,b)=>{
-    let x=a[sortKey],y=b[sortKey];
-    if(x==null)return 1; if(y==null)return -1;
-    if(typeof x==="string")return sortAsc?x.localeCompare(y):y.localeCompare(x);
-    return sortAsc?x-y:y-x;
+  function visible(s){
+    if(F.deliverable&&!s.dlv) return false;
+    if(F.public&&!s.pub) return false;
+    if(F.pns&&F.unperm) return s.pns||s.st==="not-permissioned";
+    if(F.pns) return s.pns;
+    if(F.unperm) return s.st==="not-permissioned";
+    return true;
+  }
+  function popup(s){
+    const homes=s.dmin==null?"<i>not published</i>"
+      :(s.dmin===s.dmax?fmt(s.dmin):fmt(s.dmin)+"\u2013"+fmt(s.dmax));
+    return `<div class="pop"><b>${s.ad||"(no address given)"}</b><hr>
+      <span class="k">Borough</span> ${s.b}<br>
+      <span class="k">Area</span> ${s.ha!=null?fmt(s.ha,2)+" ha":"\u2013"}<br>
+      <span class="k">Homes (council estimate)</span> ${homes}<br>
+      <span class="k">Status</span> ${s.pns?"<b>Permitted, not started</b>":s.st}<br>
+      <span class="k">Permission granted</span> ${s.pd||"\u2013"}
+      ${s.u?`<hr><a href="${s.u}" target="_blank" rel="noopener">Site plan \u2197</a>`:""}</div>`;
+  }
+  function drawSites(){
+    siteLayer.clearLayers();
+    let n=0;
+    for(const s of SITES){
+      if(!visible(s)||(sel&&s.b!==sel)) continue;
+      n++;
+      const r=Math.max(3,Math.min(16,Math.sqrt(s.ha||0.05)*3.4));
+      L.circleMarker([s.y,s.x],{radius:r,color:statusColor(s),weight:1,
+        opacity:.85,fillOpacity:.38}).bindPopup(popup(s)).addTo(siteLayer);
+    }
+    document.getElementById("mapcount").textContent=fmt(n)+" sites";
+    document.getElementById("mapscope").textContent=
+      (sel?sel:"All London")+" \u00b7 matching current filters";
+  }
+  function demandColor(v,max){
+    if(v==null) return "transparent";
+    return `color-mix(in srgb, ${CSSV("--slate")} ${Math.round(12+Math.min(1,v/max)*66)}%, transparent)`;
+  }
+  function drawBoundaries(){
+    boundaryLayer.clearLayers();
+    const maxD=Math.max(...DATA.map(r=>r.demand_gap_per_km2||0));
+    L.geoJSON(BOR,{style:f=>{
+        const p=f.properties, on=sel===p.borough;
+        return {color:on?CSSV("--amber"):CSSV("--ink-3"),
+          weight:on?2.4:1,opacity:on?1:.55,
+          fillColor:F.demand?demandColor(p.demand_gap_per_km2,maxD):CSSV("--ink-3"),
+          fillOpacity:F.demand?1:(on?.12:.04)};
+      },
+      onEachFeature:(f,l)=>{
+        const p=f.properties;
+        l.on("click",()=>select(sel===p.borough?null:p.borough));
+        const home=p.homes_min_permitted_not_started;
+        l.bindTooltip(`<b>${p.borough}</b><br>${fmt(p.hectares_permitted_not_started,1)} ha permitted, not started`
+          +(home==null?"<br><i>capacity not published</i>"
+            :`<br>${fmt(home)} homes \u00b7 ${fmt(p.pct_of_target_pns)}% of target`),{sticky:true});
+      }}).addTo(boundaryLayer);
+  }
+  function select(b){
+    sel=b; drawBoundaries(); drawSites(); mtable();
+    if(b){const f=BOR.features.find(f=>f.properties.borough===b);
+      if(f) map.fitBounds(L.geoJSON(f).getBounds(),{padding:[30,30]});}
+    else map.fitBounds(L.geoJSON(BOR).getBounds(),{padding:[12,12]});
+  }
+  window.__select=select;
+  function mtable(){
+    const rows=[...DATA].sort((a,b)=>{
+      let x=a[msort],y=b[msort];
+      if(x==null)return 1; if(y==null)return -1;
+      if(typeof x==="string")return masc?x.localeCompare(y):y.localeCompare(x);
+      return masc?x-y:y-x;
+    });
+    document.querySelector("#mtbl tbody").innerHTML=rows.map(r=>{
+      // same segment-level rule as the ledger: null means not published
+      const np=r.homes_min_permitted_not_started==null;
+      const pct=r.pct_of_target_pns;
+      return `<tr class="${sel===r.borough?"sel":""}" data-b="${r.borough}">
+        <td><div class="cell">${r.borough}</div></td>
+        <td><div class="cell mono">${fmt(r.hectares_permitted_not_started,1)}</div></td>
+        <td><div class="cell mono">${np?'<span class="np">n/p</span>':fmt(r.homes_min_permitted_not_started)}</div></td>
+        <td><div class="cell mono ${pct>=100?"over":""}" ${pct>=100?'style="color:var(--crit);font-weight:600"':""}>${pct==null?'<span class="np">\u2014</span>':fmt(pct)+"%"}</div></td>
+      </tr>`;
+    }).join("");
+    document.querySelectorAll("#mtbl tbody tr").forEach(tr=>
+      tr.onclick=()=>select(sel===tr.dataset.b?null:tr.dataset.b));
+  }
+  document.querySelectorAll("#mtbl th").forEach(th=>th.onclick=()=>{
+    const k=th.dataset.s;
+    if(msort===k) masc=!masc; else {msort=k; masc=(k==="borough");}
+    mtable();
   });
-  const maxPct=Math.max(...SC.map(r=>r.pct_of_target_pns||0));
-  tb.innerHTML=rows.map(r=>{
-    const nocap=!r.homes_capacity_reported;
-    const flag=r.data_quality_flag||"";
-    const w=r.pct_of_target_pns?Math.max(2,(r.pct_of_target_pns/maxPct)*40):0;
-    return `<tr class="${sel===r.borough?"sel":""}" data-b="${r.borough}">
-      <td>${r.borough}${flag?` <span class="flag" title="${flag}">⚑</span>`:""}</td>
-      <td>${fmt(r.sites_permitted_not_started)}</td>
-      <td>${fmt(r.hectares_permitted_not_started,1)}</td>
-      <td>${nocap?'<span class="flag" title="Borough publishes no dwelling capacity">n/p</span>':fmt(r.homes_min_permitted_not_started)}</td>
-      <td>${nocap?"–":fmt(r.pct_of_target_pns)+"%"}<span class="bar" style="width:${w}px"></span></td>
-      <td>${fmt(r.median_permission_age_years,1)}</td></tr>`;
-  }).join("");
-  tb.querySelectorAll("tr").forEach(tr=>tr.onclick=()=>select(
-    sel===tr.dataset.b?null:tr.dataset.b));
+  document.querySelectorAll("button.f").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.k; F[k]=!F[k];
+    b.setAttribute("aria-pressed",F[k]);
+    document.getElementById("duaNote").hidden=!F.demand;
+    drawBoundaries(); drawSites();
+  });
+
+  mtable();
+  Promise.all([
+    fetch("data/boroughs.json").then(r=>r.json()),
+    fetch("data/sites.json").then(r=>r.json()),
+  ]).then(([bor,si])=>{
+    BOR=bor; SITES=si;
+    drawBoundaries(); drawSites();
+    map.fitBounds(L.geoJSON(BOR).getBounds(),{padding:[12,12]});
+  }).catch(e=>{
+    console.error("map init failed:",e);
+    document.getElementById("map").outerHTML=
+      '<div class="err"><b>Map data could not load.</b><br>'+
+      'The map reads <code>data/boroughs.json</code> and <code>data/sites.json</code>, '+
+      'which a browser will not fetch from a <code>file://</code> page. '+
+      'Serve the folder instead:<br><br><code>cd app &amp;&amp; python3 -m http.server 8000</code>'+
+      '<br><br>then open <code>http://localhost:8000</code>. '+
+      'The finding view above works either way.</div>';
+    document.getElementById("mapcount").textContent="\u2014";
+    document.getElementById("mapscope").textContent="map unavailable";
+  });
 }
 
-function headline(){
-  const ha=SC.reduce((a,r)=>a+(r.hectares_permitted_not_started||0),0);
-  const hm=SC.reduce((a,r)=>a+(r.homes_min_permitted_not_started||0),0);
-  document.getElementById("hl").innerHTML=
-    `${fmt(ha)} ha <small>· ${fmt(hm)} homes already permitted, not started</small>`;
+// Deep link. Deferred: this script runs before the parser reaches </body>,
+// so initMap would otherwise look for #map before it exists.
+if(location.hash==="#map"){
+  if(document.readyState==="loading")
+    document.addEventListener("DOMContentLoaded",()=>show("map"),{once:true});
+  else show("map");
 }
-
-document.querySelectorAll("button.f").forEach(b=>b.onclick=()=>{
-  const k=b.dataset.k; F[k]=!F[k]; b.classList.toggle("on",F[k]);
-  document.getElementById("duaNote").hidden=!F.demand;
-  document.getElementById("legend").style.display=F.demand?"none":"block";
-  drawBoundaries(); drawSites();
-});
-document.querySelectorAll("#tbl th").forEach(th=>th.onclick=()=>{
-  const k=th.dataset.s;
-  if(sortKey===k)sortAsc=!sortAsc; else{sortKey=k;sortAsc=(k==="borough")}
-  renderTable();
-});
-document.getElementById("btnCsv").onclick=()=>{
-  const cols=Object.keys(SC[0]);
-  const csv=[cols.join(",")].concat(SC.map(r=>cols.map(c=>{
-    const v=r[c]; return v==null?"":/[",]/.test(String(v))?`"${String(v).replace(/"/g,'""')}"`:v;
-  }).join(","))).join("\n");
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
-  a.download="london_land_ledger_scorecard.csv"; a.click();
-};
-
-Promise.all([
-  fetch("data/scorecard.json").then(r=>r.json()),
-  fetch("data/boroughs.json").then(r=>r.json()),
-  fetch("data/sites.json").then(r=>r.json()),
-]).then(([sc,bor,si])=>{
-  SC=sc; BOR=bor; SITES=si;
-  headline(); drawBoundaries(); drawSites(); renderTable();
-  // Frame London itself rather than trusting a hardcoded zoom.
-  map.fitBounds(L.geoJSON(BOR).getBounds(),{padding:[16,16]});
-}).catch(e=>{
-  document.getElementById("hl").textContent="Data failed to load";
-  document.getElementById("hlsub").textContent=e.message+" — serve this folder over http (see README)";
-});
 </script>
 </body>
 </html>

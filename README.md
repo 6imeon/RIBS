@@ -56,7 +56,7 @@ works offline apart from basemap tiles. Data layers render with wifi off.
 
 | Path | |
 |---|---|
-| `app/index.html` | Map + sortable scorecard, single file, no build step |
+| `app/index.html` | The whole front end. Two views: **The finding** (headline, quadrant chart, ranked ledger) and **Explore the map**. No build step |
 | `data/processed/borough_scorecard.csv` | **The deliverable.** 33 boroughs, all metrics |
 | `data/processed/london_sites.csv` | 5,185 cleaned live London sites |
 | `data/processed/status_normalisation_audit.csv` | Every permission-status remap, auditable |
@@ -117,9 +117,14 @@ Read these before quoting any number.
 
 ### The coverage caveat that matters most
 
-**8 of 33 boroughs publish no dwelling capacity at all** — Bromley, Ealing, Enfield,
-Harrow, Havering, Hillingdon, Kingston upon Thames, Tower Hamlets. Between them they
-have 679 live sites and 363 hectares of permitted-but-unstarted land.
+**9 of 33 boroughs publish no dwelling capacity for their permitted-but-unstarted
+sites** — Bromley, Ealing, Enfield, Harrow, Havering, Hillingdon, Kingston upon Thames,
+Sutton, Tower Hamlets. Between them they have 782 live sites and 387 hectares.
+
+This is tested per segment, not just per borough: Sutton publishes capacity on some
+sites but none of its permitted-unstarted ones, so it is `n/p` here. Westminster and
+Redbridge are the opposite case — their sites do state capacity and it is genuinely
+zero, which is a finding rather than a gap. 24 boroughs can be ranked.
 
 They are shown as **`n/p`** (not published), **never as zero**, and are excluded from
 every percentage-of-target ranking. A zero there would be missing data masquerading

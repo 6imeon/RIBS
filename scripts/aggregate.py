@@ -55,12 +55,20 @@ def main() -> None:
     sites["permission_date"] = pd.to_datetime(sites["permission_date"], errors="coerce")
 
     def block(df: pd.DataFrame, suffix: str) -> pd.DataFrame:
-        return df.groupby("gss_code").agg(**{
+        out = df.groupby("gss_code").agg(**{
             f"sites{suffix}": ("entity", "count"),
             f"hectares{suffix}": ("hectares", "sum"),
             f"homes_min{suffix}": ("minimum-net-dwellings", "sum"),
             f"homes_max{suffix}": ("maximum-net-dwellings", "sum"),
+            # How many sites in THIS segment actually state a capacity. A
+            # segment where none do sums to 0, which is missing data, not a
+            # finding — distinct from a borough that genuinely records zero.
+            f"homes_reported{suffix}": ("minimum-net-dwellings",
+                                        lambda s: int(s.notna().sum())),
         })
+        none_reported = out[f"homes_reported{suffix}"] == 0
+        out.loc[none_reported, [f"homes_min{suffix}", f"homes_max{suffix}"]] = pd.NA
+        return out
 
     total = block(sites, "_total")
 
@@ -121,7 +129,9 @@ def main() -> None:
         ("pct_of_target_unpermissioned", "homes_min_unpermissioned"),
         ("pct_of_target_total", "homes_min_total"),
     ]:
-        sc[col] = (sc[src] / sc["ten_year_target"] * 100).where(has_homes)
+        # Null unless the borough reports capacity AND this segment does.
+        sc[col] = (sc[src] / sc["ten_year_target"] * 100).where(
+            has_homes & sc[src].notna())
 
     sc["homes_capacity_reported"] = has_homes
     sc["data_quality_flag"] = ""
