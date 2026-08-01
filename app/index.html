@@ -59,6 +59,8 @@ button.f:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 .legend-map{display:flex;flex-wrap:wrap;gap:12px;font-size:11.5px;color:var(--ink-2)}
 .legend-map i{width:9px;height:9px;border-radius:50%;display:inline-block;
   margin-right:5px;vertical-align:-1px}
+.legend-map i.stuck-key{background:transparent;border:1.5px dotted var(--crit);
+  box-sizing:border-box}
 .maphint{font-size:12px;color:var(--ink-3)}
 
 /* --- demand lens: mode switch, insight sentence, leaderboard --- */
@@ -115,6 +117,40 @@ button.m:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
 .pop b{font-size:13.5px}
 .pop hr{border:0;border-top:1px solid var(--rule);margin:7px 0}
 .pop .k{color:var(--ink-3)}
+/* Application timeline (BOPS) — hover tooltip + click popup */
+.tl-tip{min-width:220px;max-width:280px}
+.tl-tip .tl-head{margin-bottom:8px}
+.tl-tip .tl-ref{font-size:12px;font-weight:650;letter-spacing:-.01em}
+.tl-tip .tl-meta{font-size:11px;color:var(--ink-3);margin-top:2px}
+.tl-tip .tl-out{display:inline-block;margin-top:5px;padding:1px 7px;border-radius:3px;
+  font-size:10.5px;font-weight:650;letter-spacing:.02em;text-transform:uppercase}
+.tl-out.granted{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.tl-out.refused{background:color-mix(in srgb,var(--crit) 16%,transparent);color:var(--crit)}
+.tl-out.in_progress{background:color-mix(in srgb,var(--mauve) 18%,transparent);color:var(--mauve)}
+.tl-out.withdrawn,.tl-out.closed{background:var(--rule-2);color:var(--ink-2)}
+.tl{list-style:none;margin:0;padding:0;position:relative}
+.tl::before{content:"";position:absolute;left:4px;top:4px;bottom:4px;width:1.5px;
+  background:var(--rule)}
+.tl li{position:relative;padding:0 0 0 16px}
+.tl li::before{content:"";position:absolute;left:1px;top:5px;width:7px;height:7px;
+  border-radius:50%;background:var(--card);border:1.5px solid var(--ink-3);box-sizing:border-box}
+.tl li.done::before{background:var(--slate);border-color:var(--slate)}
+.tl li.decision.granted::before{background:var(--ok);border-color:var(--ok)}
+.tl li.decision.refused::before{background:var(--crit);border-color:var(--crit)}
+.tl-row{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:baseline}
+.tl .tl-l{font-size:11.5px;line-height:1.25;color:var(--ink)}
+.tl .tl-d{font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tl-span{font-size:11px;color:var(--ink-2);margin:0 0 8px;padding-bottom:6px;
+  border-bottom:1px solid var(--rule)}
+.tl-span b{font-weight:650;color:var(--ink)}
+.tl-gap{font-size:10px;letter-spacing:.02em;color:var(--ink-3);line-height:1.2;
+  padding:3px 0 5px}
+.tl-gap.gap-mid{color:var(--amber-ink);font-weight:650}
+.tl-gap.gap-long{color:var(--crit);font-weight:650}
+.tl-pop{max-width:320px}
+.tl-pop .tl-desc{font-size:12px;color:var(--ink-2);margin:6px 0 10px;line-height:1.4}
+.leaflet-tooltip.tl-tooltip{padding:10px 12px;max-width:300px;white-space:normal;
+  box-shadow:var(--shadow)}
 .leaflet-control-zoom a{background:var(--card);color:var(--ink);border-color:var(--rule)}
 .leaflet-control-attribution{background:color-mix(in srgb,var(--card) 86%,transparent);
   color:var(--ink-3);font-size:10px}
@@ -590,16 +626,18 @@ footer a{color:var(--ink-2)}
 <div id="view-map" role="tabpanel" aria-labelledby="tab-map" hidden>
   <section style="border-bottom:0;padding-bottom:14px">
     <div class="shead"><h2>Every site, mapped</h2></div>
-    <p class="deck">Each circle is one brownfield site, sized by area. Click a borough
-    to filter the table and zoom; click a site for its address, capacity and permission
-    history. Sites without published coordinates are counted in the table but cannot
-    be drawn.</p>
+    <p class="deck">Each circle is one brownfield site, sized by area. Turn on
+    <b>Application timelines</b> to hover digital planning applications
+    (Camden, Barnet, Lambeth, Southwark pilots) and see a standardised lifecycle
+    from receipt to decision. Click a borough to filter and zoom.</p>
 
     <div class="filters" id="filters">
       <button class="f" data-k="pns" aria-pressed="true">Permitted, not started</button>
       <button class="f" data-k="unperm" aria-pressed="false">Identified, no permission</button>
       <button class="f" data-k="deliverable" aria-pressed="false">Deliverable &le;5 yrs</button>
       <button class="f" data-k="public" aria-pressed="false">Public-owned</button>
+      <button class="f" data-k="apps" aria-pressed="false">Application timelines</button>
+      <button class="f" data-k="stuck" aria-pressed="false">Stuck &gt;1 month</button>
       <button class="f" data-k="demand" aria-pressed="false">Demand pressure</button>
       <button class="f" data-k="opp" aria-pressed="false">Opportunity index</button>
     </div>
@@ -628,6 +666,14 @@ footer a{color:var(--ink-2)}
           <span><i style="background:var(--amber)"></i>Permitted, not started</span>
           <span><i style="background:var(--slate)"></i>No permission</span>
           <span><i style="background:var(--mauve)"></i>Pending decision</span>
+        </div>
+        <div class="legend-map" id="appslegend" hidden>
+          <span><i style="background:var(--ok)"></i>Granted</span>
+          <span><i style="background:var(--crit)"></i>Refused</span>
+          <span><i style="background:var(--mauve)"></i>In progress</span>
+          <span><i style="background:var(--ink-3)"></i>Closed / withdrawn</span>
+          <span><i class="stuck-key"></i>Stuck &gt;1 month (undecided)</span>
+          <span style="color:var(--ink-3)">Hover for timeline · click for detail</span>
         </div>
         <!-- Replaces the site-dot legend while the opportunity fill is on:
              a legend describing dots is wrong when the eye is reading fill. -->
@@ -728,6 +774,8 @@ footer a{color:var(--ink-2)}
   Supply: brownfield land registers via planning.data.gov.uk, Open Government Licence v3.0 ·
   Targets: London Plan 2021 Table 4.1, net housing completions 2019/20–2028/29 ·
   Boundaries: planning.data.gov.uk · MSOA→borough lookup: ONS Open Geography Portal.<br>
+  Application timelines: BOPS public API (Open Digital Planning pilots — Camden, Barnet,
+  Lambeth, Southwark). Pilot applications only, not the full planning register.<br>
   Live sites only (<span class="mono">end-date</span> empty). Development Corporations
   (LLDC, OPDC) excluded to avoid double-counting inside borough geography.
 </footer>
@@ -976,8 +1024,8 @@ function buildIndex(){
 buildIndex();
 
 /* ---------------- map ---------------- */
-const F={pns:true,unperm:false,deliverable:false,public:false,demand:false,opp:false};
-let SITES=[],BOR=null,sel=null,msort="pct_of_target_pns",masc=false;
+const F={pns:true,unperm:false,deliverable:false,public:false,apps:false,stuck:false,demand:false,opp:false};
+let SITES=[],BOR=null,APPS=[],sel=null,msort="pct_of_target_pns",masc=false;
 // Scale = shortfall density (gap/km2). Scarcity = how stretched supply is.
 // Scale leads because it answers "where is the biggest problem", which is the
 // question a councillor actually arrives with.
@@ -1036,6 +1084,7 @@ function initMap(){
     tiles.setUrl(tileUrl(isDark()));
     if(BOR) drawBoundaries();
     if(SITES.length) drawSites();
+    if(APPS.length) drawApps();
   };
   matchMedia("(prefers-color-scheme:dark)").addEventListener?.("change",retheme);
   new MutationObserver(retheme).observe(document.documentElement,
@@ -1045,10 +1094,105 @@ function initMap(){
   // Above the fill it annotates, below the site dots so it never hides one.
   const badgeLayer=L.layerGroup().addTo(map);
   const siteLayer=L.layerGroup().addTo(map);
+  const appLayer=L.layerGroup().addTo(map);
 
   const statusColor=s=>s.pns?CSSV("--amber")
     :s.st==="not-permissioned"?CSSV("--slate")
     :s.st==="pending-decision"?CSSV("--mauve"):CSSV("--ink-3");
+
+  const OUTCOME_LABEL={
+    granted:"Granted", refused:"Refused", in_progress:"In progress",
+    withdrawn:"Withdrawn", closed:"Closed",
+  };
+  const outcomeColor=o=>o==="granted"?CSSV("--ok")
+    :o==="refused"?CSSV("--crit")
+    :o==="in_progress"?CSSV("--mauve")
+    :CSSV("--ink-3");
+
+  function fmtDay(iso){
+    if(!iso) return "\u2013";
+    const d=new Date(iso+"T12:00:00");
+    if(Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+  }
+  function daysBetween(a,b){
+    if(!a||!b) return null;
+    const da=new Date(a+"T12:00:00"), db=new Date(b+"T12:00:00");
+    if(Number.isNaN(da.getTime())||Number.isNaN(db.getTime())) return null;
+    return Math.round((db-da)/86400000);
+  }
+  function fmtGap(days){
+    if(days==null) return "";
+    if(days===0) return "same day";
+    if(days===1) return "1 day";
+    if(days<0) return Math.abs(days)+" days earlier"; // data quirk: out-of-order stamps
+    if(days<14) return days+" days";
+    if(days<60){
+      const w=Math.round(days/7);
+      return w+" week"+(w===1?"":"s")+" ("+days+"d)";
+    }
+    const m=Math.round(days/30.44);
+    return m+" month"+(m===1?"":"s")+" ("+days+"d)";
+  }
+  function gapClass(days){
+    if(days==null||days<=0) return "";
+    if(days>=120) return "gap-long";
+    if(days>=42) return "gap-mid";
+    return "";
+  }
+  function esc(s){
+    return String(s??"").replace(/[&<>"']/g,c=>({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function timelineList(a){
+    const ev=a.ev||[];
+    if(!ev.length) return `<p class="tl-meta">No dated milestones published yet.</p>`;
+    // Span from first to last milestone — the whole journey length.
+    const span=daysBetween(ev[0].at, ev[ev.length-1].at);
+    const head=span!=null&&ev.length>1
+      ? `<div class="tl-span">Full span · <b>${esc(fmtGap(span))}</b></div>` : "";
+    const rows=ev.map((e,i)=>{
+      const isDec=e.k==="determined";
+      const cls=["done", isDec?"decision":"", isDec?a.o:""].filter(Boolean).join(" ");
+      const next=i<ev.length-1?ev[i+1]:null;
+      const gap=next?daysBetween(e.at, next.at):null;
+      const gcls=gapClass(gap);
+      const gapHtml=gap!=null
+        ? `<div class="tl-gap ${gcls}">${esc(fmtGap(gap))}</div>`
+        : "";
+      return `<li class="${cls}">`+
+        `<div class="tl-row"><span class="tl-l">${esc(e.l)}</span>`+
+        `<span class="tl-d mono">${esc(fmtDay(e.at))}</span></div>${gapHtml}</li>`;
+    }).join("");
+    return `${head}<ol class="tl">${rows}</ol>`;
+  }
+  function appTooltip(a){
+    const out=OUTCOME_LABEL[a.o]||a.o;
+    return `<div class="tl-tip">
+      <div class="tl-head">
+        <div class="tl-ref mono">${esc(a.r)}</div>
+        <div class="tl-meta">${esc(a.cl)} · ${esc(a.tl)}</div>
+        <span class="tl-out ${esc(a.o)}">${esc(out)}</span>
+      </div>
+      ${timelineList(a)}
+    </div>`;
+  }
+  function appPopup(a){
+    const out=OUTCOME_LABEL[a.o]||a.o;
+    const desc=a.desc?`<p class="tl-desc">${esc(a.desc)}</p>`:"";
+    return `<div class="pop tl-pop">
+      <b>${esc(a.ad||a.r)}</b>
+      <div class="tl-meta" style="margin-top:3px">${esc(a.fr)} · ${esc(a.cl)}</div>
+      <div class="tl-meta">${esc(a.tl)}${a.pc?" · "+esc(a.pc):""}</div>
+      <span class="tl-out ${esc(a.o)}">${esc(out)}</span>
+      ${desc}
+      <div style="margin:8px 0 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:650">Lifecycle</div>
+      ${timelineList(a)}
+      <hr>
+      ${a.url?`<a href="${esc(a.url)}" target="_blank" rel="noopener">Digital Planning Register \u2197</a>`:""}
+      <div class="tl-meta" style="margin-top:6px">Pilot ODP / BOPS applications only — not the full register.</div>
+    </div>`;
+  }
 
   function visible(s){
     if(F.deliverable&&!s.dlv) return false;
@@ -1085,6 +1229,27 @@ function initMap(){
     map.setView(b.getCenter(),
       map.getBoundsZoom(b,true)-0.15,{animate:false});
   }
+  function updateMapStat(siteN, appN){
+    const showApps=F.apps||F.stuck;
+    if(F.stuck){
+      document.getElementById("mapcount").textContent=fmt(appN)+" stuck";
+      document.getElementById("mapscope").textContent=
+        (sel?sel:"Pilot boroughs")+" \u00b7 undecided &gt;30 days since received";
+    } else if(showApps&&!siteN){
+      document.getElementById("mapcount").textContent=fmt(appN)+" applications";
+      document.getElementById("mapscope").textContent=
+        (sel?sel:"Pilot boroughs")+" \u00b7 digital planning timelines";
+    } else if(showApps){
+      document.getElementById("mapcount").textContent=
+        fmt(siteN)+" sites · "+fmt(appN)+" apps";
+      document.getElementById("mapscope").textContent=
+        (sel?sel:"All London")+" \u00b7 sites + application timelines";
+    } else {
+      document.getElementById("mapcount").textContent=fmt(siteN)+" sites";
+      document.getElementById("mapscope").textContent=
+        (sel?sel:"All London")+" \u00b7 matching current filters";
+    }
+  }
   function drawSites(){
     siteLayer.clearLayers();
     let n=0;
@@ -1095,9 +1260,76 @@ function initMap(){
       L.circleMarker([s.y,s.x],{radius:r,color:statusColor(s),weight:1,
         opacity:.85,fillOpacity:.38}).bindPopup(popup(s)).addTo(siteLayer);
     }
-    document.getElementById("mapcount").textContent=fmt(n)+" sites";
-    document.getElementById("mapscope").textContent=
-      (sel?sel:"All London")+" \u00b7 matching current filters";
+    // app count filled in by drawApps (or 0 if layer off)
+    updateMapStat(n, (F.apps||F.stuck) ? appLayer.getLayers().length : 0);
+    return n;
+  }
+  function drawApps(){
+    appLayer.clearLayers();
+    // Stuck filter implies the applications layer — otherwise the button would
+    // light up and show nothing.
+    const showApps=F.apps||F.stuck;
+    if(!showApps){
+      updateMapStat([...siteLayer.getLayers()].length, 0);
+      return 0;
+    }
+    const today=new Date();
+    const todayIso=today.getFullYear()+"-"+
+      String(today.getMonth()+1).padStart(2,"0")+"-"+
+      String(today.getDate()).padStart(2,"0");
+    const receivedAt=a=>{
+      const hit=(a.ev||[]).find(e=>e.k==="received");
+      return hit?hit.at:((a.ev&&a.ev[0])?a.ev[0].at:null);
+    };
+    // Undecided for >30 days since receipt = "stuck in approval".
+    const isStuck=a=>{
+      if(a.o!=="in_progress") return false;
+      const r=receivedAt(a);
+      const d=daysBetween(r, todayIso);
+      return d!=null&&d>30;
+    };
+    const boroughMatch=a=>{
+      if(!sel) return true;
+      const want=sel.toLowerCase();
+      return a.cl.toLowerCase()===want
+        || a.c===want
+        || want.startsWith(a.cl.toLowerCase());
+    };
+    let n=0;
+    for(const a of APPS){
+      if(!boroughMatch(a)) continue;
+      const stuck=isStuck(a);
+      if(F.stuck&&!stuck) continue;
+      n++;
+      const age=stuck?daysBetween(receivedAt(a), todayIso):null;
+      const style=stuck?{
+        radius:8,
+        color:CSSV("--crit"),
+        weight:2.5,
+        opacity:1,
+        fillColor:outcomeColor(a.o),
+        fillOpacity:.45,
+        dashArray:"2, 3",
+      }:{
+        radius:7,
+        color:outcomeColor(a.o),
+        weight:1.5,
+        opacity:.95,
+        fillOpacity:.55,
+      };
+      const tip=appTooltip(a)+(stuck
+        ? `<div class="tl-meta" style="margin-top:8px;color:var(--crit);font-weight:650">Stuck · ${esc(fmtGap(age))} since received</div>`
+        : "");
+      const m=L.circleMarker([a.y,a.x],style);
+      m.bindTooltip(tip,{
+        className:"tl-tooltip",direction:"top",offset:[0,-8],
+        sticky:true,opacity:1,
+      });
+      m.bindPopup(appPopup(a),{maxWidth:340});
+      m.addTo(appLayer);
+    }
+    updateMapStat([...siteLayer.getLayers()].length, n);
+    return n;
   }
   function demandColor(v,max){
     if(v==null) return "transparent";
@@ -1297,7 +1529,7 @@ function initMap(){
     }
   }
   function select(b){
-    sel=b; drawBoundaries(); drawSites(); mtable(); drawInsight(); drawBoard();
+    sel=b; drawBoundaries(); drawSites(); drawApps(); mtable(); drawInsight(); drawBoard();
     if(b){const f=BOR.features.find(f=>f.properties.borough===b);
       if(f) map.fitBounds(L.geoJSON(f).getBounds(),{padding:[30,30]});}
     else fitLondon();
@@ -1332,6 +1564,16 @@ function initMap(){
   document.querySelectorAll("button.f").forEach(b=>b.onclick=()=>{
     const k=b.dataset.k; F[k]=!F[k];
     b.setAttribute("aria-pressed",F[k]);
+    // Stuck is an applications lens: turning it on also lights Application timelines
+    // so the red dotted markers actually appear.
+    if(k==="stuck"&&F.stuck&&!F.apps){
+      F.apps=true;
+      document.querySelector('button.f[data-k="apps"]').setAttribute("aria-pressed","true");
+    }
+    if(k==="apps"&&!F.apps&&F.stuck){
+      F.stuck=false;
+      document.querySelector('button.f[data-k="stuck"]').setAttribute("aria-pressed","false");
+    }
     document.getElementById("duaNote").hidden=!F.demand;
     // The lens switch only means anything while the demand layer is drawn.
     document.getElementById("modebar").hidden=!F.demand;
@@ -1349,10 +1591,18 @@ function initMap(){
       document.getElementById("modebar").hidden=true;
     }
     const oppOn=F.opp&&!F.demand;
+    const showApps=F.apps||F.stuck;
     document.getElementById("opplegend").hidden=!oppOn;
     document.getElementById("oppnote").hidden=!oppOn;
-    document.getElementById("maplegend").hidden=oppOn;
-    drawBoundaries(); drawMsoaLayer(); drawSites(); drawInsight(); drawBoard();
+    // Site-dot legend vs application-outcome legend: apps takes the key when on
+    // and opportunity is off; opportunity still owns the panel when lit.
+    document.getElementById("maplegend").hidden=oppOn||showApps;
+    document.getElementById("appslegend").hidden=oppOn||!showApps;
+    drawBoundaries(); drawMsoaLayer(); drawSites(); drawApps(); drawInsight(); drawBoard();
+    // Frame applications (or just the stuck subset) so sparse dots are findable.
+    if((k==="apps"||k==="stuck")&&showApps&&appLayer.getLayers().length){
+      map.fitBounds(appLayer.getBounds().pad(0.18),{animate:true});
+    }
   });
   // One switch drives the choropleth, the ranking and the sentence together —
   // they must never disagree about which lens is active.
@@ -1372,9 +1622,11 @@ function initMap(){
     // in which case the demand lens degrades to the plain choropleth.
     fetch("data/london_reference.json").then(r=>r.ok?r.json():null).catch(()=>null),
     fetch("data/msoa_demand.geojson").then(r=>r.ok?r.json():null).catch(()=>null),
-  ]).then(([bor,si,ref,msoa])=>{
+    fetch("data/bops_apps.json").then(r=>r.ok?r.json():null).catch(()=>null),
+  ]).then(([bor,si,ref,msoa,bops])=>{
     BOR=bor; SITES=si; REF=ref; MSOA=msoa;
-    drawBoundaries(); drawMsoaLayer(); drawSites(); drawInsight(); drawBoard();
+    APPS=(bops&&bops.apps)||[];
+    drawBoundaries(); drawMsoaLayer(); drawSites(); drawApps(); drawInsight(); drawBoard();
     fitLondon();
   }).catch(e=>{
     console.error("map init failed:",e);

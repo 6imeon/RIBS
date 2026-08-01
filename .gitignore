@@ -17,6 +17,8 @@ data/raw/*.csv
 data/raw/*.geojson
 data/raw/*.json
 data/raw/*.partial
+data/raw/bops/
+data/processed/bops/
 
 # --- Python ---
 .venv/
