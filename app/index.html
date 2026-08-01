@@ -269,6 +269,21 @@ tbody tr:nth-child(even){background:color-mix(in srgb,var(--rule-2) 42%,transpar
    the signal, the tint just helps the eye group them. */
 .all3{color:var(--ok);font-size:15px;line-height:1}
 .is-all3{background:color-mix(in srgb,var(--ok) 7%,transparent)}
+/* Map badge for the same claim. A white ring keeps it legible on both the
+   darkest end of the amber ramp and the hatch. */
+/* Legend swatches: the ramp mirrors oppColor's 10%->82% amber, the hatch key
+   mirrors the SVG pattern, so the legend cannot drift from the map it explains. */
+.legend-map i.ramp{width:46px;height:9px;border-radius:2px;
+  background:linear-gradient(90deg,
+    color-mix(in srgb,var(--amber) 14%,var(--paper)),
+    color-mix(in srgb,var(--amber) 90%,var(--paper)))}
+.legend-map .hatchkey{width:14px;height:10px;border-radius:2px;display:inline-block;
+  background:repeating-linear-gradient(45deg,var(--rule-2) 0 2px,
+    color-mix(in srgb,var(--ink-3) 38%,transparent) 2px 4px)}
+.all3pin{display:grid;place-items:center;pointer-events:none}
+.all3pin span{color:var(--ok);font-size:13px;line-height:1;
+  text-shadow:0 0 0 2px var(--card),0 1px 3px rgba(0,0,0,.45);
+  -webkit-text-stroke:2.5px var(--card);paint-order:stroke fill}
 .age-hot{color:var(--crit);font-weight:600}
 
 /* ---------- notes ---------- */
@@ -568,6 +583,7 @@ footer a{color:var(--ink-2)}
       <button class="f" data-k="deliverable" aria-pressed="false">Deliverable &le;5 yrs</button>
       <button class="f" data-k="public" aria-pressed="false">Public-owned</button>
       <button class="f" data-k="demand" aria-pressed="false">Demand pressure</button>
+      <button class="f" data-k="opp" aria-pressed="false">Opportunity index</button>
     </div>
 
     <!-- Only meaningful while the demand layer is on, so it reveals with it. -->
@@ -594,6 +610,13 @@ footer a{color:var(--ink-2)}
           <span><i style="background:var(--amber)"></i>Permitted, not started</span>
           <span><i style="background:var(--slate)"></i>No permission</span>
           <span><i style="background:var(--mauve)"></i>Pending decision</span>
+        </div>
+        <!-- Replaces the site-dot legend while the opportunity fill is on:
+             a legend describing dots is wrong when the eye is reading fill. -->
+        <div class="legend-map" id="opplegend" hidden>
+          <span><i class="ramp"></i>Opportunity index &mdash; low to high</span>
+          <span><span class="hatchkey"></span>Not scored (no published capacity)</span>
+          <span><span class="all3" style="font-size:12px">&#9679;</span>&nbsp;Clears all three axes</span>
         </div>
         <div class="mtablewrap">
           <table id="mtbl">
@@ -890,7 +913,7 @@ function buildIndex(){
 buildIndex();
 
 /* ---------------- map ---------------- */
-const F={pns:true,unperm:false,deliverable:false,public:false,demand:false};
+const F={pns:true,unperm:false,deliverable:false,public:false,demand:false,opp:false};
 let SITES=[],BOR=null,sel=null,msort="pct_of_target_pns",masc=false;
 // Scale = shortfall density (gap/km2). Scarcity = how stretched supply is.
 // Scale leads because it answers "where is the biggest problem", which is the
@@ -956,6 +979,8 @@ function initMap(){
     {attributes:true,attributeFilter:["data-theme"]});
   const msoaLayer=L.layerGroup().addTo(map);   // renders first → behind everything
   const boundaryLayer=L.layerGroup().addTo(map);
+  // Above the fill it annotates, below the site dots so it never hides one.
+  const badgeLayer=L.layerGroup().addTo(map);
   const siteLayer=L.layerGroup().addTo(map);
 
   const statusColor=s=>s.pns?CSSV("--amber")
@@ -968,7 +993,11 @@ function initMap(){
     if(F.pns&&F.unperm) return s.pns||s.st==="not-permissioned";
     if(F.pns) return s.pns;
     if(F.unperm) return s.st==="not-permissioned";
-    return true;
+    // No status filter selected: draw nothing. Falling through to "show every
+    // site" meant switching the last status button off *added* 1,800 dots, and
+    // it buried the borough choropleths under 4,900 markers.
+    if(F.deliverable||F.public) return true;
+    return false;
   }
   function popup(s){
     const homes=s.dmin==null?"<i>not published</i>"
@@ -1010,6 +1039,41 @@ function initMap(){
   function demandColor(v,max){
     if(v==null) return "transparent";
     return `color-mix(in srgb, ${CSSV("--slate")} ${Math.round(12+Math.min(1,v/max)*66)}%, transparent)`;
+  }
+  // Opportunity index, 0-100. Ramps the amber already used throughout for
+  // "permitted, not started" — the index is a composite of that same story, so
+  // it should not arrive as a new hue. Unscored boroughs return null and are
+  // hatched instead of filled: a borough that publishes no capacity is missing,
+  // not a zero, and a pale fill would read as "low opportunity".
+  function oppColor(v){
+    if(v==null) return null;
+    const t=Math.min(1,Math.max(0,v/100));
+    // Mix toward the page ground rather than transparency. Against a dark
+    // basemap a low-alpha amber goes *darker*, which inverted the ramp: weak
+    // boroughs read as the strongest ink in dark mode. Blending amber into the
+    // actual paper colour keeps low=faint and high=saturated in both themes.
+    return `color-mix(in srgb, ${CSSV("--amber")} ${Math.round(14+t*76)}%, ${CSSV("--paper")})`;
+  }
+  // SVG hatch for the 9 boroughs with no published capacity. Built once and
+  // reused; Leaflet's SVG renderer lets a fill reference a pattern by id.
+  function ensureHatch(){
+    if(document.getElementById("nohatch")) return;
+    const svg=document.querySelector("#map svg");
+    if(!svg) return;
+    const NS="http://www.w3.org/2000/svg";
+    const defs=document.createElementNS(NS,"defs");
+    const pat=document.createElementNS(NS,"pattern");
+    pat.setAttribute("id","nohatch"); pat.setAttribute("width","7");
+    pat.setAttribute("height","7"); pat.setAttribute("patternUnits","userSpaceOnUse");
+    pat.setAttribute("patternTransform","rotate(45)");
+    const bg=document.createElementNS(NS,"rect");
+    bg.setAttribute("width","7"); bg.setAttribute("height","7");
+    bg.setAttribute("fill",CSSV("--rule-2"));
+    const line=document.createElementNS(NS,"rect");
+    line.setAttribute("width","2.5"); line.setAttribute("height","7");
+    line.setAttribute("fill",CSSV("--ink-3")); line.setAttribute("opacity",".38");
+    pat.appendChild(bg); pat.appendChild(line);
+    defs.appendChild(pat); svg.insertBefore(defs,svg.firstChild);
   }
   // Surplus (gap<0) = teal so it reads as "fine", not as the palest blue of the shortage gradient.
   function msoaColor(gap){
@@ -1113,13 +1177,25 @@ function initMap(){
   }
   function drawBoundaries(){
     boundaryLayer.clearLayers();
+    badgeLayer.clearLayers();
     const dcol=LENS[MODE].col;
     const maxD=Math.max(...DATA.map(r=>r[dcol]||0));
+    // Demand wins if both are on: it carries the DUA attribution and the lens
+    // switch, so silently overriding it with the opportunity fill would strand
+    // both of those beside a choropleth they no longer describe.
+    const oppOn=F.opp&&!F.demand;
     L.geoJSON(BOR,{style:f=>{
         const p=f.properties, on=sel===p.borough;
         // When the MSOA layer is visible, drop the borough fill so MSOAs show through.
         // Keep a bolder outline so borough boundaries remain legible.
         const msoaOn=F.demand&&MSOA;
+        if(oppOn){
+          const c=oppColor(p.opportunity_index);
+          return {color:on?CSSV("--amber"):CSSV("--ink-3"),
+            weight:on?2.4:1,opacity:on?1:.55,
+            // No score -> hatch, never a pale fill that would read as "low".
+            fillColor:c??"url(#nohatch)",fillOpacity:c?1:.9};
+        }
         return {color:on?CSSV("--amber"):CSSV("--ink-3"),
           weight:on?2.4:msoaOn?1.5:1,opacity:on?1:msoaOn?.8:.55,
           fillColor:F.demand?demandColor(p[dcol],maxD):CSSV("--ink-3"),
@@ -1129,10 +1205,33 @@ function initMap(){
         const p=f.properties;
         l.on("click",()=>select(sel===p.borough?null:p.borough));
         const home=p.homes_min_permitted_not_started;
-        l.bindTooltip(`<b>${p.borough}</b><br>${fmt(p.hectares_permitted_not_started,1)} ha permitted, not started`
-          +(home==null?"<br><i>capacity not published</i>"
-            :`<br>${fmt(home)} homes \u00b7 ${fmt(p.pct_of_target_pns)}% of target`),{sticky:true});
+        // Under the opportunity lens the tooltip has to explain the fill, and
+        // "unscored" has to be distinguishable from "scored low".
+        if(oppOn){
+          const ix=p.opportunity_index;
+          l.bindTooltip(`<b>${p.borough}</b><br>`+(ix==null
+            ? "<i>not scored \u2014 no published capacity</i>"
+            : `Opportunity index <b>${ix}</b>`
+              +(p.all_three_high?" \u00b7 <b>clears all three</b>":"")
+              +`<br>${fmt(p.pct_of_target_pns)}% of target \u00b7 `
+              +`${fmt(home)} homes`),{sticky:true});
+        } else {
+          l.bindTooltip(`<b>${p.borough}</b><br>${fmt(p.hectares_permitted_not_started,1)} ha permitted, not started`
+            +(home==null?"<br><i>capacity not published</i>"
+              :`<br>${fmt(home)} homes \u00b7 ${fmt(p.pct_of_target_pns)}% of target`),{sticky:true});
+        }
       }}).addTo(boundaryLayer);
+    if(oppOn){
+      ensureHatch();
+      // The badge is a separate claim from the fill, so it is a separate layer
+      // rather than a colour step inside the ramp.
+      BOR.features.filter(f=>f.properties.all_three_high).forEach(f=>{
+        const c=L.geoJSON(f).getBounds().getCenter();
+        L.marker(c,{interactive:false,icon:L.divIcon({className:"all3pin",
+          html:'<span title="Clears the median on all three axes">\u25cf</span>',
+          iconSize:[14,14]})}).addTo(badgeLayer);
+      });
+    }
   }
   function select(b){
     sel=b; drawBoundaries(); drawSites(); mtable(); drawInsight(); drawBoard();
@@ -1173,6 +1272,22 @@ function initMap(){
     document.getElementById("duaNote").hidden=!F.demand;
     // The lens switch only means anything while the demand layer is drawn.
     document.getElementById("modebar").hidden=!F.demand;
+    // Two choropleths cannot share one set of polygons. Demand keeps priority
+    // (see drawBoundaries), so turning it on visibly releases the other button
+    // rather than leaving both lit while only one is drawn.
+    if(k==="demand"&&F.demand&&F.opp){
+      F.opp=false;
+      document.querySelector('button.f[data-k="opp"]').setAttribute("aria-pressed","false");
+    }
+    if(k==="opp"&&F.opp&&F.demand){
+      F.demand=false;
+      document.querySelector('button.f[data-k="demand"]').setAttribute("aria-pressed","false");
+      document.getElementById("duaNote").hidden=true;
+      document.getElementById("modebar").hidden=true;
+    }
+    const oppOn=F.opp&&!F.demand;
+    document.getElementById("opplegend").hidden=!oppOn;
+    document.getElementById("maplegend").hidden=oppOn;
     drawBoundaries(); drawMsoaLayer(); drawSites(); drawInsight(); drawBoard();
   });
   // One switch drives the choropleth, the ranking and the sentence together —

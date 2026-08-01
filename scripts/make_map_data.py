@@ -134,6 +134,22 @@ def main() -> None:
     APP.mkdir(parents=True, exist_ok=True)
     sc = pd.read_csv(PROC / "borough_scorecard.csv")
 
+    # Opportunity index, if score_index.py has been run. Optional: the map falls
+    # back to its other layers without it rather than failing the whole build.
+    ix_path = PROC / "borough_opportunity_index.csv"
+    if ix_path.exists():
+        ix = pd.read_csv(ix_path)[
+            ["gss_code", "opportunity_index", "all_three_high"]]
+        sc = sc.merge(ix, on="gss_code", how="left")
+        n = int(sc["opportunity_index"].notna().sum())
+        print(f"opportunity index: {n}/33 boroughs scored, "
+              f"{int(sc['all_three_high'].fillna(False).sum())} clear all three")
+    else:
+        print("NOTE: borough_opportunity_index.csv absent — run scripts/"
+              "score_index.py to enable the opportunity layer.")
+        sc["opportunity_index"] = pd.NA
+        sc["all_three_high"] = pd.NA
+
     # --- boundaries ---------------------------------------------------------
     lpa = pd.read_csv(RAW / "local-planning-authority.csv", dtype=str,
                       usecols=["name", "geometry", "reference", "end-date"])
@@ -168,7 +184,8 @@ def main() -> None:
                   "msoas", "msoas_surplus",
                   "tightness_mean", "pct_hectares_public",
                   "pct_sites_with_homes", "homes_capacity_reported",
-                  "data_quality_flag", "sites_permitted_not_started"):
+                  "data_quality_flag", "sites_permitted_not_started",
+                  "opportunity_index", "all_three_high"):
             v = rec.get(c)
             if pd.isna(v):
                 props[c] = None
