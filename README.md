@@ -136,6 +136,13 @@ London only, at 2), `PARTIAL_CAPACITY` (under 60% of sites report capacity).
 Additional limits:
 - **276 of 5,185 sites (5.3%) have no usable coordinates.** They are counted in every
   table total but cannot appear on the map, so map counts run slightly below table counts.
+- **The councils' own `site-plan-url` links are unreliable.** 1,162 sites publish none at
+  all; of those that do, **about half point at a whole-borough register landing page**
+  rather than the individual site, and a sampled liveness check found roughly a third of
+  the distinct URLs dead (404, timeout, or the host retired). We neither repair nor hide
+  this: each popup leads with the site's **canonical `planning.data.gov.uk/entity/…`
+  record**, which always resolves, and any council link is shown beneath it and labelled
+  "whole-borough page" when it cannot identify the individual site.
 - **Two Development Corporations are excluded.** London Plan Table 4.1 lists 35 rows,
   including LLDC (21,540) and OPDC (13,670). Their targets sit geographically inside
   boroughs, so including them would double-count. Only the 33 boroughs are scored.

@@ -58,6 +58,18 @@ def parse_multipolygon(wkt: str):
     return {"type": "MultiPolygon", "coordinates": polys}
 
 
+def _generic_url(u) -> bool:
+    """True if the url can't possibly point at one specific site.
+
+    A per-site link needs something identifying it — a query string, a
+    fragment, or a deep path. A bare register landing page has none, so it
+    lands the reader on a borough-wide map with no idea which dot to look at.
+    """
+    if pd.isna(u):
+        return False
+    return "?" not in str(u) and "#" not in str(u)
+
+
 def main() -> None:
     APP.mkdir(parents=True, exist_ok=True)
     sc = pd.read_csv(PROC / "borough_scorecard.csv")
@@ -137,8 +149,16 @@ def main() -> None:
                    if not pd.isna(r["permission_date"]) else None),
             "ad": (str(r["site-address"])[:80]
                    if not pd.isna(r["site-address"]) else None),
+            # The register's own entity id. Unlike site-plan-url this always
+            # resolves, so the app can always offer one working link.
+            "e": int(r["entity"]),
             "u": (r["site-plan-url"]
                   if not pd.isna(r["site-plan-url"]) else None),
+            # Roughly half of site-plan-urls are a borough's generic register
+            # landing page, not this site's plan, and a sampled check found
+            # ~37% of the distinct urls dead (404, timeout, host gone). Flag
+            # the generic ones so the app can label rather than oversell them.
+            "ug": bool(_generic_url(r["site-plan-url"])),
         })
     out2 = APP / "sites.json"
     out2.write_text(json.dumps(recs, separators=(",", ":")))

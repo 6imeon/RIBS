@@ -16,10 +16,23 @@
 [hidden]{display:none !important}
 
 /* ---------- map view ---------- */
+/* The map is the instrument, not an illustration — let it out of the 1120px
+   prose wrapper and give it the window. Negative margins cancel .wrap. */
 .mapgrid{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:22px;
-  align-items:start;margin-top:26px}
-#map{height:min(74vh,720px);border:1px solid var(--rule);border-radius:3px;
-  background:var(--rule-2);box-shadow:var(--shadow)}
+  align-items:start;margin-top:26px;
+  width:calc(100vw - 56px);max-width:1720px;
+  margin-left:calc(560px - 50vw);margin-right:calc(560px - 50vw)}
+@media (min-width:1776px){ /* past max-width, re-centre instead of stretching */
+  .mapgrid{width:1720px;margin-left:calc(560px - 860px);margin-right:auto}
+}
+/* Greater London is markedly wider than it is tall, and fitBounds zooms to
+   the limiting dimension — so a tall frame just buys empty Kent. Cap height
+   by aspect ratio and let the extra width do the work. */
+#map{height:min(calc(100vh - 190px),62vw);min-height:520px;max-height:920px;
+  border:1px solid var(--rule);border-radius:3px;
+  background:var(--rule-2);box-shadow:var(--shadow);cursor:grab}
+#map:active{cursor:grabbing}
+.leaflet-popup-content a{color:var(--amber-ink)}
 .mappanel{display:flex;flex-direction:column;gap:14px;position:sticky;top:16px}
 .filters{display:flex;flex-wrap:wrap;gap:7px}
 button.f{background:var(--card);border:1px solid var(--rule);color:var(--ink-2);
@@ -63,10 +76,13 @@ button.f:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 .leaflet-control-attribution{background:color-mix(in srgb,var(--card) 86%,transparent);
   color:var(--ink-3);font-size:10px}
 .leaflet-control-attribution a{color:var(--ink-2)}
+@media (max-width:1180px){ /* wrapper is no longer wider than the viewport */
+  .mapgrid{width:auto;max-width:none;margin-left:0;margin-right:0}
+}
 @media (max-width:900px){
   .mapgrid{grid-template-columns:1fr}
   .mappanel{position:static}
-  #map{height:56vh}
+  #map{height:70vh;min-height:0}
 }
 </style>
 <title>London Land Ledger — permitted, unstarted</title>
@@ -590,7 +606,10 @@ const CSSV=v=>getComputedStyle(document.documentElement).getPropertyValue(v).tri
 function initMap(){
   // SVG renderer: ~3k circles is well within its comfort zone, it survives
   // theme re-renders, and unlike canvas it stays inspectable and printable.
-  const map=L.map("map",{renderer:L.svg()}).setView([51.505,-0.09],10);
+  // zoomSnap:0 lets fitLondon keep a fractional zoom so London fills the frame;
+  // zoomDelta keeps the +/- buttons stepping by a whole level regardless.
+  const map=L.map("map",{renderer:L.svg(),zoomSnap:0,zoomDelta:1,
+    wheelPxPerZoomLevel:120}).setView([51.505,-0.09],10);
   window.__map=map;
   // Basemap follows the page theme, so the map never fights its surroundings.
   const isDark=()=>document.documentElement.dataset.theme
@@ -631,7 +650,19 @@ function initMap(){
       <span class="k">Homes (council estimate)</span> ${homes}<br>
       <span class="k">Status</span> ${s.pns?"<b>Permitted, not started</b>":s.st}<br>
       <span class="k">Permission granted</span> ${s.pd||"\u2013"}
-      ${s.u?`<hr><a href="${s.u}" target="_blank" rel="noopener">Site plan \u2197</a>`:""}</div>`;
+      <hr>
+      <a href="https://www.planning.data.gov.uk/entity/${s.e}" target="_blank"
+         rel="noopener">Full register record \u2197</a>
+      ${s.u?`<br><a href="${s.u}" target="_blank" rel="noopener">${
+        s.ug?"Borough's register (whole-borough page)":"Council site plan"} \u2197</a>`:""}
+      </div>`;
+  }
+  // fitBounds rounds *down* to a whole zoom level, which can leave London
+  // filling only half the frame. Keep the fractional zoom it computed.
+  function fitLondon(){
+    const b=L.geoJSON(BOR).getBounds();
+    map.setView(b.getCenter(),
+      map.getBoundsZoom(b,true)-0.15,{animate:false});
   }
   function drawSites(){
     siteLayer.clearLayers();
@@ -674,7 +705,7 @@ function initMap(){
     sel=b; drawBoundaries(); drawSites(); mtable();
     if(b){const f=BOR.features.find(f=>f.properties.borough===b);
       if(f) map.fitBounds(L.geoJSON(f).getBounds(),{padding:[30,30]});}
-    else map.fitBounds(L.geoJSON(BOR).getBounds(),{padding:[12,12]});
+    else fitLondon();
   }
   window.__select=select;
   function mtable(){
@@ -717,7 +748,7 @@ function initMap(){
   ]).then(([bor,si])=>{
     BOR=bor; SITES=si;
     drawBoundaries(); drawSites();
-    map.fitBounds(L.geoJSON(BOR).getBounds(),{padding:[12,12]});
+    fitLondon();
   }).catch(e=>{
     console.error("map init failed:",e);
     document.getElementById("map").outerHTML=
