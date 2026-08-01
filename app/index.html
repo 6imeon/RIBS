@@ -305,6 +305,7 @@ footer a{color:var(--ink-2)}
 
   <nav class="viewnav" role="tablist" aria-label="Views">
     <button role="tab" id="tab-ledger" aria-controls="view-ledger" aria-selected="true">The finding</button>
+    <button role="tab" id="tab-index" aria-controls="view-index" aria-selected="false">Priority index</button>
     <button role="tab" id="tab-map" aria-controls="view-map" aria-selected="false">Explore the map</button>
   </nav>
 </header>
@@ -448,6 +449,92 @@ footer a{color:var(--ink-2)}
   </div>
 </section>
 
+</div>
+
+<div id="view-index" role="tabpanel" aria-labelledby="tab-index" hidden>
+<section>
+  <div class="shead"><h2>Where all three conditions hold at once</h2></div>
+  <p class="deck">The ledger ranks boroughs on stalled capacity alone. This asks a
+  stricter question: which boroughs carry <em>high stalled capacity</em>,
+  <em>high demand pressure</em>, and a <em>large absolute number of homes</em> —
+  all three together. A borough must clear the median on every axis to score at all,
+  so a place that is exceptional on one measure and mediocre on the rest does not
+  appear.</p>
+
+  <div class="tablewrap" style="margin-top:20px">
+    <table>
+      <thead><tr>
+        <th>Borough</th>
+        <th>Index</th>
+        <th>% of target</th>
+        <th>Demand pressure</th>
+        <th>Homes stalled</th>
+      </tr></thead>
+      <tbody id="ixtb"></tbody>
+    </table>
+  </div>
+
+  <p style="font-size:12.5px;color:var(--ink-3);margin-top:12px">
+    Index is the mean of three percentile ranks, computed across the
+    <b id="ixrankable">24</b> boroughs that publish capacity. The
+    9 boroughs flagged <b class="np">n/p</b> cannot be scored — a borough that does not
+    publish capacity is missing, not low-priority.</p>
+</section>
+
+<section>
+  <div class="shead"><h2>Who just misses, and why</h2></div>
+  <p class="deck">The threshold is doing real work here, so it is worth showing what it
+  excludes. These boroughs clear two of the three axes and fail the third. In almost
+  every case the axis they fail is demand — they have the land and the permissions,
+  but the market pressure sits below the London median.</p>
+  <div class="tablewrap" style="margin-top:18px">
+    <table>
+      <thead><tr>
+        <th>Borough</th>
+        <th>Fails on</th>
+        <th>Percentile</th>
+        <th>% of target</th>
+      </tr></thead>
+      <tbody id="ixmiss"></tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="shead"><h2>How to read this — and how not to</h2></div>
+  <div class="grid2" style="margin-top:18px">
+    <div>
+      <ul class="tight">
+        <li><b>A high index is not "build here".</b> It means three independent
+        signals agree this borough is worth a planner's attention first. The decision
+        still needs local knowledge this dataset does not contain.</li>
+        <li><b>A missing score is not a low score.</b> Boroughs that publish no
+        capacity are unscored, and 20 of the 24 rankable boroughs fail at least one
+        axis. Both appear blank, and they mean different things.</li>
+      </ul>
+    </div>
+    <div>
+      <ul class="tight">
+        <li><b>The threshold is a choice, not a fact.</b> It is set at the median.
+        Moving it would change who qualifies — at a stricter cut the list shortens
+        toward Kensington &amp; Chelsea alone. <b>Waltham Forest sits exactly on the
+        line</b> at the 50th percentile for demand: it qualifies here, and would drop
+        out under any stricter cut. Read the bottom of this table as provisional.</li>
+        <li><b>Barking &amp; Dagenham is the case to argue about.</b> It holds the
+        largest stalled permitted area in London and scores nothing here, because
+        demand sits in the bottom 5%. Whether that is a reason to deprioritise it or
+        the opposite is a political question, not a statistical one.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="dua" style="margin-top:26px">
+    <b>Demand layer — restricted.</b> Source: WhereToBuild project, CAGE, University
+    of Warwick. Data provided by Dr Amrita Kulka and Dr Nikhil Datta. These are
+    research measures and are <b>not</b> official estimates of housing need, housing
+    requirements or planning targets. Event use only — not for redistribution or
+    publication without approval from Dr Kulka and Dr Datta.
+  </div>
+</section>
 </div>
 
 <div id="view-map" role="tabpanel" aria-labelledby="tab-map" hidden>
@@ -676,7 +763,8 @@ new MutationObserver(draw).observe(document.documentElement,
 <script src="vendor/leaflet.js"></script>
 <script>
 /* ---------------- view switching ---------------- */
-const VIEWS={ledger:["tab-ledger","view-ledger"],map:["tab-map","view-map"]};
+const VIEWS={ledger:["tab-ledger","view-ledger"],index:["tab-index","view-index"],
+             map:["tab-map","view-map"]};
 let mapReady=false;
 function show(v){
   for(const [name,[tab,panel]] of Object.entries(VIEWS)){
@@ -690,10 +778,86 @@ function show(v){
     else if(window.__map) setTimeout(()=>window.__map.invalidateSize(),0);
     if(window.__map) setTimeout(()=>window.__map.invalidateSize(),0);
   }
-  history.replaceState(null,"",v==="map"?"#map":"#finding");
+  history.replaceState(null,"",v==="map"?"#map":v==="index"?"#index":"#finding");
 }
 document.getElementById("tab-ledger").onclick=()=>show("ledger");
+document.getElementById("tab-index").onclick=()=>show("index");
 document.getElementById("tab-map").onclick=()=>show("map");
+
+/* ---------------- priority index ----------------
+   Ported from score_index.py (see INDEX_METHODOLOGY.md). Computed here from the
+   same DATA the rest of the page uses rather than loading a separate CSV, so the
+   two can never disagree about a borough's figures.
+
+   One deliberate departure from the script: it ranks on `demand_gap_per_km2`,
+   the MEAN across a borough's MSOAs. Everything else in this app switched to the
+   median, because London's distribution is skewed badly enough that the mean sits
+   58% above it. Ranking on the mean and captioning with the median would let the
+   two disagree about the same borough, so the median is used throughout. */
+const AXES=[
+  {k:"pct_of_target_pns",               lbl:"capacity"},
+  {k:"demand_gap_per_km2_median",       lbl:"demand"},
+  {k:"homes_min_permitted_not_started", lbl:"homes"},
+];
+// pandas rank(pct=True): average rank for ties, divided by n. Reimplemented
+// rather than approximated so the output matches score_index.py exactly.
+function pctRank(vals){
+  const n=vals.length, idx=vals.map((v,i)=>[v,i]).sort((a,b)=>a[0]-b[0]);
+  const out=new Array(n);
+  for(let i=0;i<n;){
+    let j=i; while(j+1<n && idx[j+1][0]===idx[i][0]) j++;
+    const avg=(i+j+2)/2;               // 1-based average rank across the tie
+    for(let k=i;k<=j;k++) out[idx[k][1]]=avg/n;
+    i=j+1;
+  }
+  return out;
+}
+// 1st/2nd/3rd/4th — 11-13 are the exceptions ("13th", not "13rd").
+function ord(n){
+  const t=n%100, s=(t>=11&&t<=13) ? "th"
+    : ["th","st","nd","rd"][n%10] || "th";
+  return n+s;
+}
+function buildIndex(){
+  // Only boroughs publishing capacity can be ranked; the rest are missing, not zero.
+  const rk=DATA.filter(r=>r.pct_of_target_pns!=null
+    && AXES.every(a=>r[a.k]!=null));
+  const ranks=AXES.map(a=>pctRank(rk.map(r=>r[a.k])));
+  rk.forEach((r,i)=>{
+    r._p=AXES.map((_,j)=>ranks[j][i]);
+    r._clear=r._p.filter(p=>p>=0.5).length;
+    r._ix=r._clear===3 ? +(r._p.reduce((s,p)=>s+p,0)/3*100).toFixed(1) : null;
+  });
+  document.getElementById("ixrankable").textContent=rk.length;
+
+  const nf=n=>n==null?'<span class="np">n/p</span>':Math.round(n).toLocaleString();
+  const scored=rk.filter(r=>r._ix!=null).sort((a,b)=>b._ix-a._ix);
+  document.getElementById("ixtb").innerHTML=scored.map(r=>{
+    // Flagged boroughs still qualify, but their underlying counts are thinner.
+    const flag=/PARTIAL_CAPACITY|LOW_SITE_COUNT/.test(r.data_quality_flag||"")
+      ? ' <span class="np" title="Partial capacity or low site count">&#9873;</span>' : "";
+    return `<tr><td><b>${r.borough}</b>${flag}</td>
+      <td class="mono"><b>${r._ix}</b></td>
+      <td class="mono">${Math.round(r.pct_of_target_pns)}%</td>
+      <td class="mono">${Math.round(r.demand_gap_per_km2_median).toLocaleString()}</td>
+      <td class="mono">${nf(r.homes_min_permitted_not_started)}</td></tr>`;
+  }).join("");
+
+  // Near-misses: clear exactly two axes. Shows what the threshold costs.
+  const miss=rk.filter(r=>r._clear===2).map(r=>{
+    const j=r._p.indexOf(Math.min(...r._p));
+    return {r,axis:AXES[j].lbl,p:r._p[j]};
+  }).sort((a,b)=>a.p-b.p);
+  document.getElementById("ixmiss").innerHTML=miss.map(({r,axis,p})=>
+    `<tr><td>${r.borough}</td><td>${axis}</td>
+     <td class="mono">${ord(Math.round(p*100))}</td>
+     <td class="mono">${Math.round(r.pct_of_target_pns)}%</td></tr>`).join("");
+}
+// Called here, not beside the ledger render: `buildIndex` is defined in this
+// second <script> block, and a call placed in the first one runs before this
+// block is parsed — which failed silently apart from one console error, leaving
+// the panel visibly empty.
+buildIndex();
 
 /* ---------------- map ---------------- */
 const F={pns:true,unperm:false,deliverable:false,public:false,demand:false};

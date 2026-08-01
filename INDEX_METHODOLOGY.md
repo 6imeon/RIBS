@@ -67,18 +67,52 @@ discarding genuinely exceptional performance on the other two — which would
 have demoted Kensington and Chelsea despite it topping two of the three axes
 outright.
 
+## Mean vs median demand — the app departs from `score_index.py`
+
+`score_index.py` ranks on `demand_gap_per_km2`, the **mean** of `gap_per_km2`
+across a borough's MSOAs. The **Priority index** view in `app/index.html` ranks on
+`demand_gap_per_km2_median` instead.
+
+This is deliberate. London's `gap_per_km2` distribution is badly skewed — the
+London-wide mean is 606 against a median of 383, a 58% overstatement — so the rest
+of the app standardised on medians when the demand lens was built. Ranking the index
+on the mean while every comparison sentence beside it used the median would let the
+two disagree about the same borough on the same screen.
+
+It changes the result:
+
+| Borough | Index (median) | Index (mean, per `score_index.py`) |
+|---|--:|--:|
+| Kensington and Chelsea | 86.1 | 86.1 |
+| Wandsworth | 84.7 | 83.3 |
+| Camden | 83.3 | 83.3 |
+| Lewisham | 75.0 | 73.6 |
+| Waltham Forest | 61.1 | *unscored* |
+
+**Waltham Forest is the sensitive case.** Its demand percentile is exactly 0.500 on
+medians and 0.458 on means, so it qualifies under one and not the other. It sits
+precisely on the threshold and would drop out under any stricter cut. The app labels
+it as provisional rather than presenting it as settled.
+
+`score_index.py` has been left as-is so the two can be compared. If the median is
+adopted as canonical, line 30 of that script is the one to change.
+
 ## Result (as of this data pull)
+
+Median-based, as rendered in the app:
 
 | Borough | Index |
 |---|--:|
 | Kensington and Chelsea | 86.1 |
+| Wandsworth | 84.7 |
 | Camden | 83.3 |
-| Wandsworth | 83.3 |
-| Lewisham | 73.6 |
+| Lewisham | 75.0 |
+| Waltham Forest | 61.1 |
 
 All other rankable boroughs fail to clear 50th percentile on at least one axis
 and are unscored (shown as low/no score on the map, not excluded from the map
-itself).
+itself). 20 of the 24 rankable boroughs fail at least one axis; the app's
+"Who just misses, and why" table shows the seven that clear two of three.
 
 ## Confidence flag
 
