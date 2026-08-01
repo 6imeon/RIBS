@@ -136,16 +136,17 @@ def main() -> None:
     # --- geometry -----------------------------------------------------------
     pts = parse_point(sites["point"].fillna(""))
     sites[["lon", "lat"]] = pts
-    nogeo = sites["lat"].isna()
-    print(f"\nsites without usable coordinates : {nogeo.sum()} "
-          f"({nogeo.mean():.1%}) — kept in table, absent from map")
+    unparsed = sites["lat"].isna()
     # London bounding box sanity check: anything outside is a bad coordinate.
-    outside = (~nogeo) & ~(
+    outside = (~unparsed) & ~(
         sites["lat"].between(51.20, 51.75) & sites["lon"].between(-0.60, 0.35)
     )
     if outside.any():
-        print(f"  !! {outside.sum()} sites plot outside London bbox -> geo nulled")
+        print(f"\n  !! {outside.sum()} sites plot outside London bbox -> geo nulled")
         sites.loc[outside, ["lat", "lon"]] = pd.NA
+    nogeo = sites["lat"].isna()  # after nulling, so this matches the written file
+    print(f"sites without usable coordinates : {nogeo.sum()} "
+          f"({nogeo.mean():.1%}) — kept in table, absent from map")
 
     sites["deliverable_yes"] = sites["deliverable"].fillna("").str.strip().str.lower() == "yes"
     sites["public_owned"] = (
