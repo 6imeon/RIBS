@@ -56,16 +56,32 @@ boroughs with `NO_CAPACITY_PUBLISHED` are shown on the map as insufficient data
 (hatched/grey), never assigned a score of zero — consistent with how the
 scorecard itself already treats missing capacity.
 
-## Scoring method
+## Scoring method — two outputs, deliberately kept separate
 
 Each of the three components is percentile-ranked across the 24 rankable
-boroughs. A borough must clear the 50th percentile on **all three** to receive
-a score; if it does, the score is the mean of its three percentile ranks
-(0–100). This "threshold + average" method was chosen over a strict minimum
-because a strict minimum caps a borough's score at its single weakest input,
-discarding genuinely exceptional performance on the other two — which would
-have demoted Kensington and Chelsea despite it topping two of the three axes
-outright.
+boroughs. Combining them into a single gated score (must clear the 50th
+percentile on all three, only then averaged) produced just 4–5 scored boroughs
+and left the other ~20 rankable boroughs blank — unworkable for a full
+choropleth. The fix is to give the map and the headline claim two different
+numbers rather than forcing one number to do both jobs:
+
+1. **`opportunity_index` (0–100, continuous)** — the mean of the three
+   percentile ranks, computed for **all 24 rankable boroughs**, no gating.
+   This drives the map fill, so the choropleth reads as a gradient rather than
+   mostly grey.
+2. **`all_three_high` (boolean)** — True only if the borough *also*
+   independently clears the 50th percentile on every one of the three
+   components. This is the stricter "genuinely strong on every axis at once"
+   claim, rendered as a badge on top of the fill, never as the fill itself.
+
+This keeps both things intact: a fully populated map, and a defensible narrower
+claim about boroughs exceptional on every axis rather than merely averaging well.
+
+**Why the separation matters.** Barking and Dagenham scores 69.4 — fifth of 24 —
+on the strength of the highest absolute stalled homes in London (100th percentile)
+and near-top capacity (96th). Its demand sits at the 12th percentile. The average
+alone would present it as a top-five priority; the badge is what stops it from
+reading that way.
 
 ## Mean vs median demand — the app departs from `score_index.py`
 
@@ -79,40 +95,34 @@ of the app standardised on medians when the demand lens was built. Ranking the i
 on the mean while every comparison sentence beside it used the median would let the
 two disagree about the same borough on the same screen.
 
-It changes the result:
+It changes who earns `all_three_high`: **Waltham Forest** sits at exactly the
+0.500 demand percentile on medians and 0.458 on means, so it clears the badge
+under one and not the other. It is the single case that flips, and it sits
+precisely on the threshold — it would drop out under any stricter cut. The app
+labels it as provisional rather than presenting it as settled.
 
-| Borough | Index (median) | Index (mean, per `score_index.py`) |
-|---|--:|--:|
-| Kensington and Chelsea | 86.1 | 86.1 |
-| Wandsworth | 84.7 | 83.3 |
-| Camden | 83.3 | 83.3 |
-| Lewisham | 75.0 | 73.6 |
-| Waltham Forest | 61.1 | *unscored* |
-
-**Waltham Forest is the sensitive case.** Its demand percentile is exactly 0.500 on
-medians and 0.458 on means, so it qualifies under one and not the other. It sits
-precisely on the threshold and would drop out under any stricter cut. The app labels
-it as provisional rather than presenting it as settled.
-
-`score_index.py` has been left as-is so the two can be compared. If the median is
-adopted as canonical, line 30 of that script is the one to change.
+The handoff doc's expected output ("4 clear all three") was computed on means.
+On medians it is **5**, with Waltham Forest added. Everything else matches.
 
 ## Result (as of this data pull)
 
-Median-based, as rendered in the app:
+24/24 rankable boroughs receive a continuous `opportunity_index`; 5 clear
+`all_three_high`:
 
-| Borough | Index |
-|---|--:|
-| Kensington and Chelsea | 86.1 |
-| Wandsworth | 84.7 |
-| Camden | 83.3 |
-| Lewisham | 75.0 |
-| Waltham Forest | 61.1 |
+| Borough | Index | All three |
+|---|--:|:--:|
+| Kensington and Chelsea | 86.1 | ✓ |
+| Wandsworth | 84.7 | ✓ |
+| Camden | 83.3 | ✓ |
+| Lewisham | 75.0 | ✓ |
+| Barking and Dagenham | 69.4 | |
+| Greenwich | 66.7 | |
+| Barnet | 63.9 | |
+| Waltham Forest | 61.1 | ✓ |
+| … remaining 16 rankable boroughs score 13.9–54.2 | | |
 
-All other rankable boroughs fail to clear 50th percentile on at least one axis
-and are unscored (shown as low/no score on the map, not excluded from the map
-itself). 20 of the 24 rankable boroughs fail at least one axis; the app's
-"Who just misses, and why" table shows the seven that clear two of three.
+The 9 boroughs with `NO_CAPACITY_PUBLISHED` remain unscored (None) throughout —
+insufficient data, never zero.
 
 ## Confidence flag
 

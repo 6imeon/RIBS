@@ -263,6 +263,12 @@ tbody tr:nth-child(even){background:color-mix(in srgb,var(--rule-2) 42%,transpar
   border-right-color:var(--crit)}
 .over .pctv{color:var(--crit);font-weight:600}
 .np{color:var(--ink-3);font-style:italic;font-size:12px}
+/* The "all three axes" mark. --ok is the palette's affirmative green, already
+   used for surplus; this is the index's one piece of good news, so it reuses it
+   rather than introducing a hue. Row tint is deliberately faint — the badge is
+   the signal, the tint just helps the eye group them. */
+.all3{color:var(--ok);font-size:15px;line-height:1}
+.is-all3{background:color-mix(in srgb,var(--ok) 7%,transparent)}
 .age-hot{color:var(--crit);font-weight:600}
 
 /* ---------- notes ---------- */
@@ -453,19 +459,23 @@ footer a{color:var(--ink-2)}
 
 <div id="view-index" role="tabpanel" aria-labelledby="tab-index" hidden>
 <section>
-  <div class="shead"><h2>Where all three conditions hold at once</h2></div>
-  <p class="deck">The ledger ranks boroughs on stalled capacity alone. This asks a
-  stricter question: which boroughs carry <em>high stalled capacity</em>,
-  <em>high demand pressure</em>, and a <em>large absolute number of homes</em> —
-  all three together. A borough must clear the median on every axis to score at all,
-  so a place that is exceptional on one measure and mediocre on the rest does not
-  appear.</p>
+  <div class="shead"><h2>Three signals, ranked together</h2></div>
+  <p class="deck">The ledger ranks boroughs on stalled capacity alone. This combines
+  three: <em>stalled capacity</em> as a share of target, <em>demand pressure</em>, and
+  the <em>absolute number of homes</em> held up. Each is percentile-ranked and averaged,
+  so every borough that publishes capacity gets a score.</p>
+  <p class="deck">The score and the badge answer different questions, and are kept
+  separate on purpose. The <b>score</b> is an average — a borough can rank well on it
+  while being mediocre on one axis. The <b>&#9679; badge</b> is the stricter claim:
+  this borough clears the London median on <em>all three axes independently</em>.
+  <b id="ixall3">5</b> of <b id="ixrankable">24</b> do.</p>
 
   <div class="tablewrap" style="margin-top:20px">
     <table>
       <thead><tr>
         <th>Borough</th>
         <th>Index</th>
+        <th title="Clears the median on all three axes independently">All three</th>
         <th>% of target</th>
         <th>Demand pressure</th>
         <th>Homes stalled</th>
@@ -475,18 +485,21 @@ footer a{color:var(--ink-2)}
   </div>
 
   <p style="font-size:12.5px;color:var(--ink-3);margin-top:12px">
-    Index is the mean of three percentile ranks, computed across the
-    <b id="ixrankable">24</b> boroughs that publish capacity. The
-    9 boroughs flagged <b class="np">n/p</b> cannot be scored — a borough that does not
-    publish capacity is missing, not low-priority.</p>
+    Index is the mean of three percentile ranks across the 24 boroughs that publish
+    capacity. The 9 boroughs flagged <b class="np">n/p</b> are unscored — a borough that
+    does not publish capacity is missing, not low-priority, and never scores zero.
+    <b class="np">&#9873;</b> marks partial capacity or a low site count: the score
+    stands, but rests on thinner counts.</p>
 </section>
 
 <section>
-  <div class="shead"><h2>Who just misses, and why</h2></div>
-  <p class="deck">The threshold is doing real work here, so it is worth showing what it
-  excludes. These boroughs clear two of the three axes and fail the third. In almost
-  every case the axis they fail is demand — they have the land and the permissions,
-  but the market pressure sits below the London median.</p>
+  <div class="shead"><h2>Who misses the badge, and on what</h2></div>
+  <p class="deck">These boroughs clear two of the three axes and fail the third — they
+  score, sometimes highly, but do not earn the badge. In almost every case the axis
+  they fail is demand: they have the land and the permissions, but market pressure
+  sits below the London median. Whether that argues for deprioritising them or for
+  building where land is actually available is a political question, not a
+  statistical one.</p>
   <div class="tablewrap" style="margin-top:18px">
     <table>
       <thead><tr>
@@ -508,9 +521,13 @@ footer a{color:var(--ink-2)}
         <li><b>A high index is not "build here".</b> It means three independent
         signals agree this borough is worth a planner's attention first. The decision
         still needs local knowledge this dataset does not contain.</li>
-        <li><b>A missing score is not a low score.</b> Boroughs that publish no
-        capacity are unscored, and 20 of the 24 rankable boroughs fail at least one
-        axis. Both appear blank, and they mean different things.</li>
+        <li><b>A missing score is not a low score.</b> The 9 boroughs that publish no
+        capacity are absent from this table entirely. They are not at the bottom of
+        it — they are not in it, and that is a gap in what councils publish, not a
+        finding about those boroughs.</li>
+        <li><b>An average can hide a weak axis.</b> Barking &amp; Dagenham scores 69.4
+        — fifth — on the strength of capacity and raw homes, while its demand sits in
+        the bottom 15%. That is exactly what the badge is for.</li>
       </ul>
     </div>
     <div>
@@ -826,18 +843,31 @@ function buildIndex(){
   rk.forEach((r,i)=>{
     r._p=AXES.map((_,j)=>ranks[j][i]);
     r._clear=r._p.filter(p=>p>=0.5).length;
-    r._ix=r._clear===3 ? +(r._p.reduce((s,p)=>s+p,0)/3*100).toFixed(1) : null;
+    // Two separate outputs, and they answer different questions. The score is
+    // ungated so all 24 rankable boroughs get a real value; `_all3` is the
+    // stricter "strong on every axis at once" claim, shown as a mark rather than
+    // folded into the number. Gating the score itself left 20 of 24 blank.
+    r._ix=+(r._p.reduce((s,p)=>s+p,0)/3*100).toFixed(1);
+    r._all3=r._clear===3;
   });
   document.getElementById("ixrankable").textContent=rk.length;
+  document.getElementById("ixall3").textContent=rk.filter(r=>r._all3).length;
 
   const nf=n=>n==null?'<span class="np">n/p</span>':Math.round(n).toLocaleString();
-  const scored=rk.filter(r=>r._ix!=null).sort((a,b)=>b._ix-a._ix);
+  // Ties are real — Hounslow, Richmond and Merton all land on 47.2 — so break
+  // them by name. Without it the order depends on sort stability and the table
+  // can disagree with borough_opportunity_index.csv about rows that are equal.
+  const scored=rk.slice().sort((a,b)=>b._ix-a._ix||a.borough.localeCompare(b.borough));
   document.getElementById("ixtb").innerHTML=scored.map(r=>{
-    // Flagged boroughs still qualify, but their underlying counts are thinner.
+    // Flagged boroughs still score, but their underlying counts are thinner.
     const flag=/PARTIAL_CAPACITY|LOW_SITE_COUNT/.test(r.data_quality_flag||"")
       ? ' <span class="np" title="Partial capacity or low site count">&#9873;</span>' : "";
-    return `<tr><td><b>${r.borough}</b>${flag}</td>
+    const all3=r._all3
+      ? '<span class="all3" title="Clears the 50th percentile on all three axes independently">&#9679;</span>'
+      : '<span class="all3-no"></span>';
+    return `<tr${r._all3?' class="is-all3"':''}><td><b>${r.borough}</b>${flag}</td>
       <td class="mono"><b>${r._ix}</b></td>
+      <td>${all3}</td>
       <td class="mono">${Math.round(r.pct_of_target_pns)}%</td>
       <td class="mono">${Math.round(r.demand_gap_per_km2_median).toLocaleString()}</td>
       <td class="mono">${nf(r.homes_min_permitted_not_started)}</td></tr>`;
