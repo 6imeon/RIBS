@@ -1,0 +1,24 @@
+# --- DUA-RESTRICTED: WhereToBuild (CAGE, University of Warwick) ---
+# Event-only. Do not commit, redistribute, or upload publicly.
+# Delete after the event (DUA clause 7).
+wheretobuild_msoa_stats.csv
+data/raw/wheretobuild_msoa_stats.csv
+data/restricted/
+**/wheretobuild*
+*_msoa_stats.csv
+
+# Record-level or MSOA-level derivatives of the above are equally restricted.
+data/processed/*msoa*
+data/processed/*restricted*
+
+# --- Bulk downloads (cached, re-fetchable; keep the repo light) ---
+data/raw/*.csv
+data/raw/*.geojson
+data/raw/*.json
+data/raw/*.partial
+
+# --- Python ---
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
