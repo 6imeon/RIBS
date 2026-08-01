@@ -706,6 +706,7 @@ let MODE="scale";
 // means: City of London drags the London mean 58% above the median, so a
 // mean-based "typical area" would overstate every comparison.
 let REF=null;
+let MSOA=null;
 const LENS={
   scale:{
     col:"demand_gap_per_km2_median", ref:"median_gap_per_km2",
@@ -759,6 +760,7 @@ function initMap(){
   matchMedia("(prefers-color-scheme:dark)").addEventListener?.("change",retheme);
   new MutationObserver(retheme).observe(document.documentElement,
     {attributes:true,attributeFilter:["data-theme"]});
+  const msoaLayer=L.layerGroup().addTo(map);   // renders first → behind everything
   const boundaryLayer=L.layerGroup().addTo(map);
   const siteLayer=L.layerGroup().addTo(map);
 
@@ -814,6 +816,36 @@ function initMap(){
   function demandColor(v,max){
     if(v==null) return "transparent";
     return `color-mix(in srgb, ${CSSV("--slate")} ${Math.round(12+Math.min(1,v/max)*66)}%, transparent)`;
+  }
+  // Surplus (gap<0) = teal so it reads as "fine", not as the palest blue of the shortage gradient.
+  function msoaColor(gap){
+    if(gap==null) return "transparent";
+    if(gap<0)    return "#0d9488";  // teal — supply exceeds demand
+    if(gap<200)  return "#dbeafe";
+    if(gap<500)  return "#93c5fd";
+    if(gap<1000) return "#3b82f6";
+    if(gap<2000) return "#1d4ed8";
+    return "#1e3a8a";
+  }
+  function drawMsoaLayer(){
+    msoaLayer.clearLayers();
+    if(!MSOA||!F.demand) return;
+    L.geoJSON(MSOA,{
+      style:f=>({
+        fillColor:msoaColor(f.properties.gap),
+        fillOpacity:.58, color:"transparent", weight:0,
+      }),
+      onEachFeature:(f,l)=>{
+        const p=f.properties, surplus=p.gap!=null&&p.gap<0;
+        l.bindTooltip(
+          `<b>${p.lad_name||""}</b><br>`+
+          (surplus
+            ? `<span style="color:#0d9488">▲ Supply exceeds demand</span>`
+            : `Gap: ${p.gap!=null?Math.round(p.gap)+"&nbsp;households":"—"}`),
+          {sticky:true}
+        );
+      },
+    }).addTo(msoaLayer);
   }
 
   /* ---- demand lens: insight sentence + leaderboard ---- */
@@ -891,10 +923,13 @@ function initMap(){
     const maxD=Math.max(...DATA.map(r=>r[dcol]||0));
     L.geoJSON(BOR,{style:f=>{
         const p=f.properties, on=sel===p.borough;
+        // When the MSOA layer is visible, drop the borough fill so MSOAs show through.
+        // Keep a bolder outline so borough boundaries remain legible.
+        const msoaOn=F.demand&&MSOA;
         return {color:on?CSSV("--amber"):CSSV("--ink-3"),
-          weight:on?2.4:1,opacity:on?1:.55,
+          weight:on?2.4:msoaOn?1.5:1,opacity:on?1:msoaOn?.8:.55,
           fillColor:F.demand?demandColor(p[dcol],maxD):CSSV("--ink-3"),
-          fillOpacity:F.demand?1:(on?.12:.04)};
+          fillOpacity:msoaOn?0:F.demand?1:(on?.12:.04)};
       },
       onEachFeature:(f,l)=>{
         const p=f.properties;
@@ -944,7 +979,7 @@ function initMap(){
     document.getElementById("duaNote").hidden=!F.demand;
     // The lens switch only means anything while the demand layer is drawn.
     document.getElementById("modebar").hidden=!F.demand;
-    drawBoundaries(); drawSites(); drawInsight(); drawBoard();
+    drawBoundaries(); drawMsoaLayer(); drawSites(); drawInsight(); drawBoard();
   });
   // One switch drives the choropleth, the ranking and the sentence together —
   // they must never disagree about which lens is active.
@@ -963,9 +998,10 @@ function initMap(){
     // Optional: absent when the pipeline runs without the restricted extract,
     // in which case the demand lens degrades to the plain choropleth.
     fetch("data/london_reference.json").then(r=>r.ok?r.json():null).catch(()=>null),
-  ]).then(([bor,si,ref])=>{
-    BOR=bor; SITES=si; REF=ref;
-    drawBoundaries(); drawSites(); drawInsight(); drawBoard();
+    fetch("data/msoa_demand.geojson").then(r=>r.ok?r.json():null).catch(()=>null),
+  ]).then(([bor,si,ref,msoa])=>{
+    BOR=bor; SITES=si; REF=ref; MSOA=msoa;
+    drawBoundaries(); drawMsoaLayer(); drawSites(); drawInsight(); drawBoard();
     fitLondon();
   }).catch(e=>{
     console.error("map init failed:",e);

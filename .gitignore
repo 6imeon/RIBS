@@ -10,6 +10,7 @@ data/restricted/
 # Record-level or MSOA-level derivatives of the above are equally restricted.
 data/processed/*msoa*
 data/processed/*restricted*
+app/data/msoa_demand.geojson
 
 # --- Bulk downloads (cached, re-fetchable; keep the repo light) ---
 data/raw/*.csv
